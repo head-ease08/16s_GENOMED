@@ -1,0 +1,240 @@
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Loading data and running QC
+
+Load packages, set working directory and random seed.
+
+```{r results='hide', message=FALSE, warning=FALSE}
+require(dada2)
+require(phyloseq)
+require(Biostrings)
+require(ggplot2)
+require(DECIPHER)   
+require(phangorn)   # for phylogenetic tree construction
+require(ape)        # tree manipulation / I/O
+
+set.seed(42)
+setwd('./')
+```
+
+```{r}
+path = "./"
+
+forward.raw <- sort(list.files(path, pattern = "_R1.*\\.fastq", full.names = TRUE))
+reverse.raw <- sort(list.files(path, pattern = "_R2.*\\.fastq", full.names = TRUE))
+
+# must be same number 
+stopifnot(length(forward.raw) == length(reverse.raw))
+
+# extract names
+sample.names <- sapply(basename(forward.raw),
+                       function(x) sub("_R1.*", "", x))
+sample.names <- unname(sample.names)
+sample.names
+```
+
+```{r warning=FALSE}
+plotQualityProfile(forward.raw, n = 50000)
+plotQualityProfile(reverse.raw, n = 50000)
+```
+
+```{r warning=FALSE}
+plotQualityProfile(forward.raw, aggregate = TRUE, n = 100000)
+plotQualityProfile(reverse.raw, aggregate = TRUE, n = 100000)
+```
+
+## Cutadapt
+
+```{r}
+path <- "./trimmed_reads"
+forward.cut <- sort(list.files(path, pattern = "_R1\\.fastq\\.gz$", full.names = TRUE))
+reverse.cut <- sort(list.files(path, pattern = "_R2\\.fastq\\.gz$", full.names = TRUE))
+```
+
+```{r}
+cutadapt_summary <- read.table("trimmed_reads/cutadapt_summary.tsv",
+                               header = TRUE, sep = "\t")
+```
+## Error model
+
+Train a parametric error model **separately** for forward and reverse reads
+(they have different error profiles).
+
+```{r}
+forward.err <- learnErrors(forward.qc, multithread = TRUE, MAX_CONSIST = 20)
+reverse.err <- learnErrors(reverse.qc, multithread = TRUE, MAX_CONSIST = 20)
+```
+
+```{r warning=FALSE}
+plotErrors(forward.err, nominalQ = TRUE)
+plotErrors(reverse.err, nominalQ = TRUE)
+```
+
+## Dereplication and DADA2 inference
+```{r echo=T, results='hide', message=F, warning=FALSE}
+forward.derep <- derepFastq(forward.qc, n = 1e7, verbose = TRUE)
+reverse.derep <- derepFastq(reverse.qc, n = 1e7, verbose = TRUE)
+
+names(forward.derep) <- sample.names
+names(reverse.derep) <- sample.names
+
+forward.dada <- dada(forward.derep, err = forward.err,
+                     pool = FALSE, multithread = TRUE)
+reverse.dada <- dada(reverse.derep, err = reverse.err,
+                     pool = FALSE, multithread = TRUE)
+```
+
+## Merge paired reads
+```{r echo=T, message=F, warning=FALSE}
+mergers <- mergePairs(forward.dada, forward.derep,
+                      reverse.dada, reverse.derep,
+                      minOverlap = 12,
+                      maxMismatch = 0,
+                      verbose = TRUE)
+
+head(mergers[[1]])
+
+sequence.table <- makeSequenceTable(mergers)
+dim(sequence.table)
+
+table(nchar(getSequences(sequence.table)))
+```
+
+Optionally, restrict to the expected amplicon length range to remove obvious
+non-target sequences:
+
+```{r}
+seqtab.lenfilt <- sequence.table[, nchar(colnames(sequence.table)) %in% 400:430]
+dim(seqtab.lenfilt)
+```
+
+## Chimera removal
+
+```{r}
+seqtab.nochim <- removeBimeraDenovo(seqtab.lenfilt,
+                                    method = "consensus",
+                                    multithread = TRUE,
+                                    verbose = TRUE)
+dim(seqtab.nochim)
+sum(seqtab.nochim) / sum(seqtab.lenfilt)
+```
+
+## Track reads through the pipeline
+
+```{r}
+getN <- function(x) sum(getUniques(x))
+track <- cbind(qc.out,
+               sapply(forward.dada, getN),
+               sapply(reverse.dada, getN),
+               sapply(mergers, getN),
+               rowSums(seqtab.nochim))
+colnames(track) <- c("input", "filtered",
+                     "denoisedF", "denoisedR",
+                     "merged", "nonchim")
+rownames(track) <- sample.names
+track
+
+dir.create("results", showWarnings = FALSE)
+write.csv(track, "results/track.csv", row.names = TRUE)
+```
+
+## Taxonomy assignment
+
+```{r}
+taxa <- assignTaxonomy(seqtab.nochim,
+                       "./silva_nr_v132_train_set.fa.gz",
+                       multithread = TRUE, tryRC = TRUE)
+taxa <- addSpecies(taxa,
+                   "./silva_species_assignment_v132.fa.gz",
+                   tryRC = TRUE)
+```
+
+## Phylogenetic tree (DECIPHER + phangorn)
+
+
+
+```{r message=FALSE, warning=FALSE}
+# Pull ASV sequences from the chimera-free table
+seqs <- getSequences(seqtab.nochim)
+names(seqs) <- seqs   # required by phangorn downstream
+
+# Multiple sequence alignment
+alignment <- AlignSeqs(DNAStringSet(seqs),
+                       anchor = NA,
+                       processors = NULL,
+                       verbose = FALSE)
+
+# Convert to phangorn format
+phang.align <- phyDat(as(alignment, "matrix"), type = "DNA")
+
+# Distance matrix and NJ starting tree
+dm     <- dist.ml(phang.align)
+treeNJ <- NJ(dm)
+
+# ML optimization under GTR+G+I
+fit    <- pml(treeNJ, data = phang.align)
+fitGTR <- update(fit, k = 4, inv = 0.2)
+fitGTR <- optim.pml(fitGTR,
+                    model         = "GTR",
+                    optInv        = TRUE,
+                    optGamma      = TRUE,
+                    rearrangement = "stochastic",
+                    control       = pml.control(trace = 0))
+
+# Save the tree for reuse
+dir.create("results", showWarnings = FALSE)
+ape::write.tree(fitGTR$tree, file = "results/asv_tree.nwk")
+```
+
+## Build the phyloseq object (now with a tree)
+
+Prepare metadata as before.
+
+```{r}
+metadata <- read.table(file = "sample-metadata.tsv",
+                       comment.char = "", header = TRUE, sep = "\t")
+manifest <- read.table(file = "manifest.tsv",
+                       header = TRUE, sep = "\t")
+
+manifest$absolute.filepath <- substring(manifest$absolute.filepath, 6)
+
+merged_table   <- merge(manifest, metadata,
+                        by.x = "sample.id", by.y = "X.SampleID")
+resulting_table <- merged_table[, c(2, 1, 3:7)]
+rownames(resulting_table) <- merged_table$absolute.filepath
+resulting_table <- resulting_table[, -1]
+```
+
+Assemble the phyloseq object — this time including the tree.
+
+```{r}
+ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows = FALSE),
+               sample_data(resulting_table),
+               tax_table(taxa),
+               phy_tree(fitGTR$tree))
+```
+
+Replace long DNA strings with short ASV IDs (DNA preserved in `refseq`).
+
+```{r}
+dna <- Biostrings::DNAStringSet(taxa_names(ps))
+names(dna) <- taxa_names(ps)
+ps <- merge_phyloseq(ps, dna)
+taxa_names(ps) <- paste0("ASV", seq(ntaxa(ps)))
+ps
+```
+
+Now phylogenetic metrics are available, e.g.:
+
+```{r eval=FALSE}
+# Faith's PD via picante (if installed)
+# library(picante)
+# pd <- picante::pd(as(otu_table(ps), "matrix"), phy_tree(ps))
+
+# UniFrac distances
+unifrac.uw <- UniFrac(ps, weighted = FALSE)
+unifrac.w  <- UniFrac(ps, weighted = TRUE)
+```
+
