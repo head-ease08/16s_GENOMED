@@ -214,7 +214,7 @@ rule assign_taxonomy:
 
 rule add_species:
     input:
-        taxa = "/results/taxa/taxa.rds"
+        taxa = "/results/taxa/taxa.rds",
         silva = "/references/db/silva.fa.gz"
     output:
         taxa = "/results/taxa/taxa.rds"
