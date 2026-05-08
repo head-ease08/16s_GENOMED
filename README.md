@@ -7,7 +7,7 @@
 ## 📁 Структура проекта
 
 ```
-dead_mans_teeth/
+16short/
 │
 ├── 📄 README.md
 ├── 📑 dada2_paired_cutadapt_tree.Rmd     # основной R-пайплайн
@@ -46,6 +46,29 @@ dead_mans_teeth/
     ├── rep_seqs.csv
     ├── metadata.csv
     └── asv_tree.nwk
+```
+
+---
+
+## Requirements
+
+| Tool | Minimum version | Notes |
+|------|----------------|-------|
+| cutadapt | **>= 3.0** | `-j` multithreading and `file:` adapter pools require >= 3.0 |
+| Python | >= 3.6 | cutadapt runtime dependency |
+
+Install cutadapt:
+
+```bash
+pip install "cutadapt>=3.0"
+# or via conda:
+conda install -c bioconda "cutadapt>=3.0"
+```
+
+Verify before running:
+
+```bash
+cutadapt --version   # must print 3.0 or higher
 ```
 
 ---

@@ -1,0 +1,5 @@
+require(dada2)
+require(Biostrings)
+require(ggplot2)
+plotQualityProfile(forward.raw, n = 50000)
+plotQualityProfile(reverse.raw, n = 50000)
