@@ -177,9 +177,12 @@ rule make_seqtable:
         "scripts/make_seqtable.R"
 
 
-    ```{r echo=T, message=F, warning=FALSE}
-
-sequence.table <- makeSequenceTable(mergers)
-dim(sequence.table)
-
-table(nchar(getSequences(sequence.table)))
+rule remove_chimera:
+    input:
+        sequence_table = "results/seqtab.rds",
+    output:
+        seq_tab_nochim = "results/seqtab_nochim.rds"
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/remove_chimera.R"
