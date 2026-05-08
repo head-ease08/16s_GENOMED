@@ -4,14 +4,17 @@ sink(log, type = "message")
 
 library(dada2)
 
-filterAndTrim(
-    snakemake@input$r1,  snakemake@output$r1,
-    snakemake@input$r2,  snakemake@output$r2,
-    truncLen    = c(240, 200),
-    maxN        = 0,
-    maxEE       = c(2, 2),
-    truncQ      = 2,
-    rm.phix     = TRUE,
-    compress    = TRUE,
-    multithread = TRUE
+saveRDS(
+    filterAndTrim(
+        snakemake@input$r1,  snakemake@output$r1,
+        snakemake@input$r2,  snakemake@output$r2,
+        truncLen    = c(240, 200),
+        maxN        = 0,
+        maxEE       = c(2, 2),
+        truncQ      = 2,
+        rm.phix     = TRUE,
+        compress    = TRUE,
+        multithread = TRUE
+    ),
+    snakemake@output$stats
 )

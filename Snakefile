@@ -102,8 +102,9 @@ rule filter_reads:
         r1 = TRIMMED_DIR + "/{sample}_R1.fastq.gz",
         r2 = TRIMMED_DIR + "/{sample}_R2.fastq.gz",
     output:
-        r1 = QC_DIR + "/{sample}_R1.fastq.gz",
-        r2 = QC_DIR + "/{sample}_R2.fastq.gz",
+        r1    = QC_DIR + "/{sample}_R1.fastq.gz",
+        r2    = QC_DIR + "/{sample}_R2.fastq.gz",
+        stats = "results/filter_stats/{sample}.rds",
     conda:
         "envs/dada2.yaml"
     script:
@@ -186,3 +187,16 @@ rule remove_chimera:
         "envs/dada2.yaml"
     script:
         "scripts/remove_chimera.R"
+
+rule create_summary:
+    input:
+        filter_stats  = expand("results/filter_stats/{sample}.rds", sample=SAMPLES),
+        dada_fwd      = expand("results/dada/{sample}_R1.rds", sample=SAMPLES),
+        mergers       = expand("results/merged/{sample}.rds", sample=SAMPLES),
+        seqtab_nochim = "results/seqtab_nochim.rds",
+    output:
+        summary = "results/track.csv",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/create_summary.R"
