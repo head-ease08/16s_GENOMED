@@ -108,3 +108,18 @@ rule filter_reads:
         "envs/dada2.yaml"
     script:
         "scripts/filter_reads.R"
+
+rule error_correction:
+    input:
+        r1 = expand(QC_DIR + "/{sample}_R1.fastq.gz", sample=SAMPLES),
+        r2 = expand(QC_DIR + "/{sample}_R2.fastq.gz", sample=SAMPLES),
+    output:
+        r1_rds = "results/err_forward.rds",
+        r2_rds = "results/err_reverse.rds",
+        r1_pdf = "results/plots/error_model_forward.pdf",
+        r2_pdf = "results/plots/error_model_reverse.pdf",
+
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/error_correction_model.R"
