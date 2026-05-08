@@ -1,5 +1,9 @@
-require(dada2)
-require(Biostrings)
-require(ggplot2)
-plotQualityProfile(forward.raw, n = 50000)
-plotQualityProfile(reverse.raw, n = 50000)
+library(dada2)
+
+ggsave(snakemake@output$r1_pdf,
+       plotQualityProfile(snakemake@input$r1, n = 50000),
+       width = 10, height = 6)
+
+ggsave(snakemake@output$r2_pdf,
+       plotQualityProfile(snakemake@input$r2, n = 50000),
+       width = 10, height = 6)

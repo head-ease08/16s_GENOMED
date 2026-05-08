@@ -80,8 +80,6 @@ rule quality_per_sample:
     output:
         r1_pdf = f"{QC_DIR}/per_sample_forward.pdf",
         r2_pdf = f"{QC_DIR}/per_sample_reverse.pdf",
-    log:
-        "logs/quality_per_sample.log"
     conda:
         "envs/dada2.yaml"
     script:
@@ -94,8 +92,6 @@ rule quality_aggregated:
     output:
         r1_pdf = f"{QC_DIR}/aggregated_forward.pdf",
         r2_pdf = f"{QC_DIR}/aggregated_reverse.pdf",
-    log:
-        "logs/quality_aggregated.log"
     conda:
         "envs/dada2.yaml"
     script:
@@ -108,8 +104,6 @@ rule filter_reads:
     output:
         r1 = QC_DIR + "/{sample}_R1.fastq.gz",
         r2 = QC_DIR + "/{sample}_R2.fastq.gz",
-    log:
-        "logs/filter_reads/{sample}.log",
     conda:
         "envs/dada2.yaml"
     script:
