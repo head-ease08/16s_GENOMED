@@ -118,8 +118,37 @@ rule error_correction:
         r2_rds = "results/err_reverse.rds",
         r1_pdf = "results/plots/error_model_forward.pdf",
         r2_pdf = "results/plots/error_model_reverse.pdf",
-
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/error_correction_model.R"
+
+
+rule dereplication:
+    input:
+        r1 = QC_DIR + "/{sample}_R1.fastq.gz",
+        r2 = QC_DIR + "/{sample}_R2.fastq.gz",
+    output:
+        r1_rds = "results/derep/{sample}_R1.rds",
+        r2_rds = "results/derep/{sample}_R2.rds",
+    log:
+        "logs/dereplication/{sample}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dereplication.R"
+
+
+rule dada2_inference:
+    input:
+        r1_rds     = "results/derep/{sample}_R1.rds",
+        r2_rds     = "results/derep/{sample}_R2.rds",
+        r1_err_rds = "results/err_forward.rds",
+        r2_err_rds = "results/err_reverse.rds",
+    output:
+        r1_rds = "results/dada/{sample}_R1.rds",
+        r2_rds = "results/dada/{sample}_R2.rds",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2_inference.R"
