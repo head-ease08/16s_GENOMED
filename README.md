@@ -63,6 +63,8 @@ conda install -c bioconda -c conda-forge snakemake
 │   └── dada_inference/
 │
 ├── scripts/
+│   ├── revcomp_primers.py             # обратные комплементы праймеров
+│   ├── trim_primers.sh                # вызов cutadapt
 │   ├── quality_per_sample.R
 │   ├── quality_aggregated.R
 │   ├── filter_reads.R
@@ -148,18 +150,15 @@ snakemake --cores 4 --use-conda data/qc/per_sample_forward.pdf
 snakemake --cores 8 --use-conda results/seqtab_nochim.rds
 ```
 
-### Переменные окружения для `run_cutadapt.sh`
+### Параметры обрезки праймеров (`Snakefile → trim_primers`)
 
-| Переменная | По умолчанию | Назначение |
+| Параметр | По умолчанию | Назначение |
 |---|---|---|
-| `THREADS` | `4` | потоков на один cutadapt-вызов |
-| `MIN_LEN` | `50` | минимальная длина рида после обрезки |
-| `ERROR_RATE` | `0.1` | допустимая доля ошибок в матче праймера |
+| `threads` | `4` | потоков на один cutadapt-вызов |
+| `min_len` | `50` | минимальная длина рида после обрезки |
+| `error_rate` | `0.1` | допустимая доля ошибок в матче праймера |
 
-```bash
-THREADS=8 MIN_LEN=100 ./run_cutadapt.sh data/raw/ data/trimmed/ \
-    primers/fwd_primers.fasta primers/rev_primers.fasta
-```
+Изменяются в блоке `params:` правила `trim_primers` в `Snakefile`.
 
 ---
 
@@ -167,8 +166,8 @@ THREADS=8 MIN_LEN=100 ./run_cutadapt.sh data/raw/ data/trimmed/ \
 
 | # | Правило Snakemake | Скрипт | Что делает |
 |---|---|---|---|
-| 1 | `revcomp_primers` | — | Генерирует обратные комплементы праймеров для отлова read-through |
-| 2 | `trim_primers` | cutadapt | Обрезает праймеры с обоих концов, выбрасывает необрезанные риды |
+| 1 | `revcomp_primers` | `revcomp_primers.py` | Генерирует обратные комплементы праймеров для отлова read-through |
+| 2 | `trim_primers` | `trim_primers.sh` | Обрезает праймеры с обоих концов, выбрасывает необрезанные риды |
 | 3 | `quality_per_sample` | `quality_per_sample.R` | Графики качества по каждому образцу |
 | 4 | `quality_aggregated` | `quality_aggregated.R` | Агрегированные графики качества |
 | 5 | `filter_reads` | `filter_reads.R` | `filterAndTrim`: обрезка по длине и фильтрация по maxEE |

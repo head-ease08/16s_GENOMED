@@ -12,11 +12,6 @@ for s in SAMPLES:
     r2 = f"{RAW_DIR}/{s}_R2.fastq.gz"
     assert os.path.exists(r2), f"Нет пары для {s}: {r2}"
 
-IUPAC_RC = str.maketrans(
-    "ACGTRYSWKMBDHVNacgtryswkmbdhvn",
-    "TGCAYRSWMKVHDBNtgcayrswmkvhdbn",
-)
-
 rule revcomp_primers:
     input:
         fwd = PRIMERS_DIR + "/fwd_primers.fasta",
@@ -24,17 +19,8 @@ rule revcomp_primers:
     output:
         fwd_rc = temp(PRIMERS_DIR + "/fwd_rc.fasta"),
         rev_rc = temp(PRIMERS_DIR + "/rev_rc.fasta"),
-    run:
-        def revcomp_fasta(src, dst):
-            with open(src) as f, open(dst, "w") as out:
-                for rec in f.read().lstrip(">").split(">"):
-                    if not rec.strip():
-                        continue
-                    header, *lines = rec.splitlines()
-                    seq = "".join(lines)
-                    out.write(f">{header}_RC\n{seq[::-1].translate(IUPAC_RC)}\n")
-        revcomp_fasta(input.fwd, output.fwd_rc)
-        revcomp_fasta(input.rev, output.rev_rc)
+    script:
+        "scripts/revcomp_primers.py"
 
 
 rule trim_primers:
@@ -55,22 +41,11 @@ rule trim_primers:
         min_len    = 50,
         error_rate = 0.1,
     shell:
-        """
-        cutadapt \
-            -g file:{input.fwd} \
-            -a file:{input.rev_rc} \
-            -G file:{input.rev} \
-            -A file:{input.fwd_rc} \
-            -n 2 \
-            -e {params.error_rate} \
-            --discard-untrimmed \
-            --minimum-length {params.min_len} \
-            -j {params.threads} \
-            -o {output.r1} \
-            -p {output.r2} \
-            {input.r1} {input.r2} \
-            > {log} 2>&1
-        """
+        "bash scripts/trim_primers.sh "
+        "{input.fwd} {input.rev} {input.fwd_rc} {input.rev_rc} "
+        "{input.r1} {input.r2} {output.r1} {output.r2} "
+        "{params.error_rate} {params.min_len} {params.threads} "
+        "> {log} 2>&1"
 
 
 rule quality_per_sample:
