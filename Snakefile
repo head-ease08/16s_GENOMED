@@ -200,3 +200,25 @@ rule create_summary:
         "envs/dada2.yaml"
     script:
         "scripts/create_summary.R"
+
+rule assign_taxonomy:
+    input:
+        seqtab_nochim = "results/seqtab_nochim.rds",
+        silva = "/references/db/silva.fa.gz"
+    output:
+        taxa = "/results/taxa/taxa.rds"
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/create_taxa.R"
+
+rule add_species:
+    input:
+        taxa = "/results/taxa/taxa.rds"
+        silva = "/references/db/silva.fa.gz"
+    output:
+        taxa = "/results/taxa/taxa.rds"
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/add_species.R"
