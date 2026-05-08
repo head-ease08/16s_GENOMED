@@ -5,12 +5,20 @@ QC_DIR = "data/qc"
 TRIMMED_DIR = "data/trimmed"
 PRIMERS_DIR = "primers"
 
+FILTER_INPUT = RAW_DIR if config.get("skip_trimming") else TRIMMED_DIR
+
 SAMPLES, = glob_wildcards(f"{RAW_DIR}/{{sample}}_R1.fastq.gz")
 
 import os
 for s in SAMPLES:
     r2 = f"{RAW_DIR}/{s}_R2.fastq.gz"
     assert os.path.exists(r2), f"Нет пары для {s}: {r2}"
+
+rule all:
+    input:
+        "results/track.csv",
+        "results/seqtab_nochim.rds",
+        "results/taxa/taxa.rds",
 
 rule revcomp_primers:
     input:
@@ -74,8 +82,8 @@ rule quality_aggregated:
 
 rule filter_reads:
     input:
-        r1 = TRIMMED_DIR + "/{sample}_R1.fastq.gz",
-        r2 = TRIMMED_DIR + "/{sample}_R2.fastq.gz",
+        r1 = FILTER_INPUT + "/{sample}_R1.fastq.gz",
+        r2 = FILTER_INPUT + "/{sample}_R2.fastq.gz",
     output:
         r1    = QC_DIR + "/{sample}_R1.fastq.gz",
         r2    = QC_DIR + "/{sample}_R2.fastq.gz",

@@ -1,0 +1,7 @@
+Building DAG of jobs...
+MissingInputException in rule revcomp_primers in file /home/mark/Documents/16s/16s/Snakefile, line 17:
+Missing input files for rule revcomp_primers:
+    output: primers/fwd_rc.fasta, primers/rev_rc.fasta
+    affected files:
+        primers/fwd_primers.fasta
+        primers/rev_primers.fasta
