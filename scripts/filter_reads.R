@@ -1,14 +1,17 @@
-forward.qc <- file.path(root.qc, paste0(sample.names, "_R1.fastq.gz"))
-reverse.qc <- file.path(root.qc, paste0(sample.names, "_R2.fastq.gz"))
-names(forward.qc) <- sample.names
-names(reverse.qc) <- sample.names
+log <- file(snakemake@log[[1]], open = "wt")
+sink(log)
+sink(log, type = "message")
 
-qc.out <- filterAndTrim(forward.cut, forward.qc,
-                        reverse.cut, reverse.qc,
-                        truncLen  = c(240, 200),   # tune to your quality plots
-                        maxN      = 0,
-                        maxEE     = c(2, 2),
-                        truncQ    = 2,
-                        rm.phix   = TRUE,
-                        compress  = TRUE,
-                        multithread = TRUE)
+library(dada2)
+
+filterAndTrim(
+    snakemake@input$r1,  snakemake@output$r1,
+    snakemake@input$r2,  snakemake@output$r2,
+    truncLen    = c(240, 200),
+    maxN        = 0,
+    maxEE       = c(2, 2),
+    truncQ      = 2,
+    rm.phix     = TRUE,
+    compress    = TRUE,
+    multithread = TRUE
+)

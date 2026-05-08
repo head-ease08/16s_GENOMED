@@ -103,20 +103,14 @@ rule quality_aggregated:
 
 rule filter_reads:
     input:
-        qc = f"{QC_DIR}"
+        r1 = TRIMMED_DIR + "/{sample}_R1.fastq.gz",
+        r2 = TRIMMED_DIR + "/{sample}_R2.fastq.gz",
     output:
-        r1_after_qc = f"{QC_DIR}/{sample}/_R1.fastq.gz"
-        r2_after_qc = f"{QC_DIR}/{sample}/_R2.fastq.gz"
-        qc_summary = f"{QC_DIR}/qc_summary.tsv"
+        r1 = QC_DIR + "/{sample}_R1.fastq.gz",
+        r2 = QC_DIR + "/{sample}_R2.fastq.gz",
     log:
-        "logs/filter_reads.log"
+        "logs/filter_reads/{sample}.log",
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/filter_reads.R"
-    
-    
-    
-    root.qc <- "./qc"
-
-
