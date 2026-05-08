@@ -152,3 +152,34 @@ rule dada2_inference:
         "envs/dada2.yaml"
     script:
         "scripts/dada2_inference.R"
+
+rule merge_reads:
+    input:
+        r1_rds_derep     = "results/derep/{sample}_R1.rds",
+        r2_rds_derep     = "results/derep/{sample}_R2.rds",
+        r1_rds_dada      = "results/dada/{sample}_R1.rds",
+        r2_rds_dada      = "results/dada/{sample}_R2.rds",
+    output:
+        merged_reads     = "results/merged/{sample}.rds"
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/merge_reads.R"
+
+rule make_seqtable:
+    input:
+        merged_reads = expand("results/merged/{sample}.rds", sample=SAMPLES),
+    output:
+        sequence_table = "results/seqtab.rds",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/make_seqtable.R"
+
+
+    ```{r echo=T, message=F, warning=FALSE}
+
+sequence.table <- makeSequenceTable(mergers)
+dim(sequence.table)
+
+table(nchar(getSequences(sequence.table)))
