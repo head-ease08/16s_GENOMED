@@ -22,8 +22,8 @@ setwd('./')
 ```{r}
 path = "./"
 
-forward.raw <- sort(list.files(path, pattern = "_R1.*\\.fastq", full.names = TRUE))
-reverse.raw <- sort(list.files(path, pattern = "_R2.*\\.fastq", full.names = TRUE))
+forward.raw <- sort(list.files(path, pattern = "_R1.*\\.fq", full.names = TRUE))
+reverse.raw <- sort(list.files(path, pattern = "_R2.*\\.fq", full.names = TRUE))
 
 # must be same number 
 stopifnot(length(forward.raw) == length(reverse.raw))
@@ -49,8 +49,8 @@ plotQualityProfile(reverse.raw, aggregate = TRUE, n = 100000)
 
 ```{r}
 path <- "./trimmed_reads"
-forward.cut <- sort(list.files(path, pattern = "_R1\\.fastq\\.gz$", full.names = TRUE))
-reverse.cut <- sort(list.files(path, pattern = "_R2\\.fastq\\.gz$", full.names = TRUE))
+forward.cut <- sort(list.files(path, pattern = "_R1\\.fq\\.gz$", full.names = TRUE))
+reverse.cut <- sort(list.files(path, pattern = "_R2\\.fq\\.gz$", full.names = TRUE))
 ```
 
 ```{r}

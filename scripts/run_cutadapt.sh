@@ -44,7 +44,7 @@ revcomp_fasta "$FWD_FASTA" "$FWD_RC_FASTA"
 revcomp_fasta "$REV_FASTA" "$REV_RC_FASTA"
 
 shopt -s nullglob
-R1_FILES=( "$INPUT_DIR"/*_R1*.fastq.gz "$INPUT_DIR"/*_R1*.fastq )
+R1_FILES=( "$INPUT_DIR"/*_R1*.fq.gz "$INPUT_DIR"/*_R1*.fq )
 shopt -u nullglob
 
 SUMMARY="$OUTPUT_DIR/cutadapt_summary.tsv"
@@ -55,8 +55,8 @@ for r1 in "${R1_FILES[@]}"; do
     r2="${r1/_R1/_R2}"
     sample="${base%%_R1*}"
 
-    out_r1="$OUTPUT_DIR/${sample}_R1.fastq.gz"
-    out_r2="$OUTPUT_DIR/${sample}_R2.fastq.gz"
+    out_r1="$OUTPUT_DIR/${sample}_R1.fq.gz"
+    out_r2="$OUTPUT_DIR/${sample}_R2.fq.gz"
     log="$OUTPUT_DIR/logs/${sample}.log"
 
     cutadapt \

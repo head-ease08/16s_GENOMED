@@ -1,3 +1,8 @@
+import sys
+
+sys.stdout = open(snakemake.log[0], "w")
+sys.stderr = sys.stdout
+
 IUPAC_RC = str.maketrans(
     "ACGTRYSWKMBDHVNacgtryswkmbdhvn",
     "TGCAYRSWMKVHDBNtgcayrswmkvhdbn",

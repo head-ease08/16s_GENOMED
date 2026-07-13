@@ -1,4 +1,9 @@
+log <- file(snakemake@log[[1]], open = "wt")
+sink(log)
+sink(log, type = "message")
+
 library(dada2)
+library(ggplot2)
 
 forward_err <- learnErrors(snakemake@input$r1, multithread = TRUE, MAX_CONSIST = 20)
 reverse_err <- learnErrors(snakemake@input$r2, multithread = TRUE, MAX_CONSIST = 20)

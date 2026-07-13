@@ -1,4 +1,9 @@
+log <- file(snakemake@log[[1]], open = "wt")
+sink(log)
+sink(log, type = "message")
+
 library(dada2)
+library(ggplot2)
 
 ggsave(snakemake@output$r1_pdf,
        plotQualityProfile(snakemake@input$r1, n = 50000),

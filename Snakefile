@@ -1,24 +1,33 @@
 from pathlib import Path
+import os
 
-RAW_DIR = "data/raw"
-QC_DIR = "data/qc"
+RAW_DIR     = "data/raw"
+QC_DIR      = "data/qc"
 TRIMMED_DIR = "data/trimmed"
 PRIMERS_DIR = "primers"
+REF_DIR     = "references"
 
 FILTER_INPUT = RAW_DIR if config.get("skip_trimming") else TRIMMED_DIR
 
-SAMPLES, = glob_wildcards(f"{RAW_DIR}/{{sample}}_R1.fastq.gz")
+SAMPLES, = glob_wildcards(f"{RAW_DIR}/{{sample}}_R1.fq.gz")
 
-import os
 for s in SAMPLES:
-    r2 = f"{RAW_DIR}/{s}_R2.fastq.gz"
-    assert os.path.exists(r2), f"Нет пары для {s}: {r2}"
+    r2 = f"{RAW_DIR}/{s}_R2.fq.gz"
+    assert os.path.exists(r2), f"No paired R2 for {s}: {r2}"
+
 
 rule all:
     input:
         "results/track.csv",
         "results/seqtab_nochim.rds",
-        "results/taxa/taxa.rds",
+        "results/taxa/silva/taxa_species.rds",
+        "results/taxa/rdp/taxa_species.rds",
+        "results/abundance_table_silva.csv",
+        "results/abundance_table_rdp.csv",
+        "results/tree/tree.pdf",
+        "results/plots/composition_silva.pdf",
+        "results/plots/composition_rdp.pdf",
+
 
 rule revcomp_primers:
     input:
@@ -27,27 +36,29 @@ rule revcomp_primers:
     output:
         fwd_rc = temp(PRIMERS_DIR + "/fwd_rc.fasta"),
         rev_rc = temp(PRIMERS_DIR + "/rev_rc.fasta"),
+    log:
+        "logs/revcomp_primers.log",
     script:
         "scripts/revcomp_primers.py"
 
 
 rule trim_primers:
     input:
-        r1      = RAW_DIR + "/{sample}_R1.fastq.gz",
-        r2      = RAW_DIR + "/{sample}_R2.fastq.gz",
-        fwd     = PRIMERS_DIR + "/fwd_primers.fasta",
-        rev     = PRIMERS_DIR + "/rev_primers.fasta",
-        fwd_rc  = PRIMERS_DIR + "/fwd_rc.fasta",
-        rev_rc  = PRIMERS_DIR + "/rev_rc.fasta",
+        r1     = RAW_DIR + "/{sample}_R1.fq.gz",
+        r2     = RAW_DIR + "/{sample}_R2.fq.gz",
+        fwd    = PRIMERS_DIR + "/fwd_primers.fasta",
+        rev    = PRIMERS_DIR + "/rev_primers.fasta",
+        fwd_rc = PRIMERS_DIR + "/fwd_rc.fasta",
+        rev_rc = PRIMERS_DIR + "/rev_rc.fasta",
     output:
-        r1 = TRIMMED_DIR + "/{sample}_R1.fastq.gz",
-        r2 = TRIMMED_DIR + "/{sample}_R2.fastq.gz",
+        r1 = TRIMMED_DIR + "/{sample}_R1.fq.gz",
+        r2 = TRIMMED_DIR + "/{sample}_R2.fq.gz",
     log:
         "logs/cutadapt/{sample}.log",
     params:
-        threads    = 4,
-        min_len    = 50,
-        error_rate = 0.1,
+        threads    = config.get("threads", 4),
+        min_len    = config.get("min_len", 50),
+        error_rate = config.get("error_rate", 0.1),
     shell:
         "bash scripts/trim_primers.sh "
         "{input.fwd} {input.rev} {input.fwd_rc} {input.rev_rc} "
@@ -58,50 +69,61 @@ rule trim_primers:
 
 rule quality_per_sample:
     input:
-        r1 = expand(f"{RAW_DIR}/{{sample}}_R1.fastq.gz", sample=SAMPLES),
-        r2 = expand(f"{RAW_DIR}/{{sample}}_R2.fastq.gz", sample=SAMPLES),
+        r1 = expand(f"{RAW_DIR}/{{sample}}_R1.fq.gz", sample=SAMPLES),
+        r2 = expand(f"{RAW_DIR}/{{sample}}_R2.fq.gz", sample=SAMPLES),
     output:
         r1_pdf = f"{QC_DIR}/per_sample_forward.pdf",
         r2_pdf = f"{QC_DIR}/per_sample_reverse.pdf",
+    log:
+        "logs/quality_per_sample.log",
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/quality_per_sample.R"
 
+
 rule quality_aggregated:
     input:
-        r1 = expand(f"{RAW_DIR}/{{sample}}_R1.fastq.gz", sample=SAMPLES),
-        r2 = expand(f"{RAW_DIR}/{{sample}}_R2.fastq.gz", sample=SAMPLES),
+        r1 = expand(f"{RAW_DIR}/{{sample}}_R1.fq.gz", sample=SAMPLES),
+        r2 = expand(f"{RAW_DIR}/{{sample}}_R2.fq.gz", sample=SAMPLES),
     output:
         r1_pdf = f"{QC_DIR}/aggregated_forward.pdf",
         r2_pdf = f"{QC_DIR}/aggregated_reverse.pdf",
+    log:
+        "logs/quality_aggregated.log",
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/quality_aggregated.R"
 
+
 rule filter_reads:
     input:
-        r1 = FILTER_INPUT + "/{sample}_R1.fastq.gz",
-        r2 = FILTER_INPUT + "/{sample}_R2.fastq.gz",
+        r1 = FILTER_INPUT + "/{sample}_R1.fq.gz",
+        r2 = FILTER_INPUT + "/{sample}_R2.fq.gz",
     output:
-        r1    = QC_DIR + "/{sample}_R1.fastq.gz",
-        r2    = QC_DIR + "/{sample}_R2.fastq.gz",
+        r1    = QC_DIR + "/{sample}_R1.fq.gz",
+        r2    = QC_DIR + "/{sample}_R2.fq.gz",
         stats = "results/filter_stats/{sample}.rds",
+    log:
+        "logs/filter_reads/{sample}.log",
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/filter_reads.R"
 
+
 rule error_correction:
     input:
-        r1 = expand(QC_DIR + "/{sample}_R1.fastq.gz", sample=SAMPLES),
-        r2 = expand(QC_DIR + "/{sample}_R2.fastq.gz", sample=SAMPLES),
+        r1 = expand(QC_DIR + "/{sample}_R1.fq.gz", sample=SAMPLES),
+        r2 = expand(QC_DIR + "/{sample}_R2.fq.gz", sample=SAMPLES),
     output:
         r1_rds = "results/err_forward.rds",
         r2_rds = "results/err_reverse.rds",
         r1_pdf = "results/plots/error_model_forward.pdf",
         r2_pdf = "results/plots/error_model_reverse.pdf",
+    log:
+        "logs/error_correction.log",
     conda:
         "envs/dada2.yaml"
     script:
@@ -110,8 +132,8 @@ rule error_correction:
 
 rule dereplication:
     input:
-        r1 = QC_DIR + "/{sample}_R1.fastq.gz",
-        r2 = QC_DIR + "/{sample}_R2.fastq.gz",
+        r1 = QC_DIR + "/{sample}_R1.fq.gz",
+        r2 = QC_DIR + "/{sample}_R2.fq.gz",
     output:
         r1_rds = "results/derep/{sample}_R1.rds",
         r2_rds = "results/derep/{sample}_R2.rds",
@@ -132,29 +154,37 @@ rule dada2_inference:
     output:
         r1_rds = "results/dada/{sample}_R1.rds",
         r2_rds = "results/dada/{sample}_R2.rds",
+    log:
+        "logs/dada2_inference/{sample}.log",
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/dada2_inference.R"
 
+
 rule merge_reads:
     input:
-        r1_rds_derep     = "results/derep/{sample}_R1.rds",
-        r2_rds_derep     = "results/derep/{sample}_R2.rds",
-        r1_rds_dada      = "results/dada/{sample}_R1.rds",
-        r2_rds_dada      = "results/dada/{sample}_R2.rds",
+        r1_rds_derep = "results/derep/{sample}_R1.rds",
+        r2_rds_derep = "results/derep/{sample}_R2.rds",
+        r1_rds_dada  = "results/dada/{sample}_R1.rds",
+        r2_rds_dada  = "results/dada/{sample}_R2.rds",
     output:
-        merged_reads     = "results/merged/{sample}.rds"
+        merged_reads = "results/merged/{sample}.rds",
+    log:
+        "logs/merge_reads/{sample}.log",
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/merge_reads.R"
+
 
 rule make_seqtable:
     input:
         merged_reads = expand("results/merged/{sample}.rds", sample=SAMPLES),
     output:
         sequence_table = "results/seqtab.rds",
+    log:
+        "logs/make_seqtable.log",
     conda:
         "envs/dada2.yaml"
     script:
@@ -165,11 +195,14 @@ rule remove_chimera:
     input:
         sequence_table = "results/seqtab.rds",
     output:
-        seq_tab_nochim = "results/seqtab_nochim.rds"
+        seq_tab_nochim = "results/seqtab_nochim.rds",
+    log:
+        "logs/remove_chimera.log",
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/remove_chimera.R"
+
 
 rule create_summary:
     input:
@@ -179,29 +212,139 @@ rule create_summary:
         seqtab_nochim = "results/seqtab_nochim.rds",
     output:
         summary = "results/track.csv",
+    log:
+        "logs/create_summary.log",
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/create_summary.R"
 
-rule assign_taxonomy:
+
+rule assign_taxonomy_silva:
     input:
         seqtab_nochim = "results/seqtab_nochim.rds",
-        silva = "/references/db/silva.fa.gz"
+        silva         = REF_DIR + "/silva_nr99_v138.2_toSpecies_trainset.fa.gz",
     output:
-        taxa = "/results/taxa/taxa.rds"
+        taxa = "results/taxa/silva/taxa.rds",
+    log:
+        "logs/assign_taxonomy_silva.log",
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/create_taxa.R"
+        "scripts/assign_taxa.R"
 
-rule add_species:
+
+rule add_species_silva:
     input:
-        taxa = "/results/taxa/taxa.rds",
-        silva = "/references/db/silva.fa.gz"
+        taxa  = "results/taxa/silva/taxa.rds",
+        silva = REF_DIR + "/silva_v138.2_assignSpecies.fa.gz",
     output:
-        taxa = "/results/taxa/taxa.rds"
+        taxa = "results/taxa/silva/taxa_species.rds",
+    log:
+        "logs/add_species_silva.log",
     conda:
         "envs/dada2.yaml"
     script:
         "scripts/add_species.R"
+
+
+rule assign_taxonomy_rdp:
+    input:
+        seqtab_nochim = "results/seqtab_nochim.rds",
+        silva         = REF_DIR + "/rdp_19_toSpecies_trainset.fa.gz",
+    output:
+        taxa = "results/taxa/rdp/taxa_species.rds",
+    log:
+        "logs/assign_taxonomy_rdp.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/assign_taxa.R"
+
+
+rule plot_composition_silva:
+    input:
+        seqtab_nochim = "results/seqtab_nochim.rds",
+        taxa_species  = "results/taxa/silva/taxa_species.rds",
+    output:
+        plot_pdf = "results/plots/composition_silva.pdf",
+    log:
+        "logs/plot_composition_silva.log",
+    params:
+        samples  = SAMPLES,
+        top_n    = config.get("top_n", 20),
+        width    = config.get("plot_width", 14),
+        height   = config.get("plot_height", 7),
+        metadata = config.get("metadata", "sra_metadata.csv"),
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/plot_composition.R"
+
+
+rule plot_composition_rdp:
+    input:
+        seqtab_nochim = "results/seqtab_nochim.rds",
+        taxa_species  = "results/taxa/rdp/taxa_species.rds",
+    output:
+        plot_pdf = "results/plots/composition_rdp.pdf",
+    log:
+        "logs/plot_composition_rdp.log",
+    params:
+        samples  = SAMPLES,
+        top_n    = config.get("top_n", 20),
+        width    = config.get("plot_width", 14),
+        height   = config.get("plot_height", 7),
+        metadata = config.get("metadata", "sra_metadata.csv"),
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/plot_composition.R"
+
+
+rule make_abundance_table_silva:
+    input:
+        seqtab_nochim = "results/seqtab_nochim.rds",
+        taxa_species  = "results/taxa/silva/taxa_species.rds",
+    output:
+        abundance_table = "results/abundance_table_silva.csv",
+    log:
+        "logs/make_abundance_table_silva.log",
+    params:
+        samples = SAMPLES,
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/make_abundance_table.R"
+
+
+rule make_abundance_table_rdp:
+    input:
+        seqtab_nochim = "results/seqtab_nochim.rds",
+        taxa_species  = "results/taxa/rdp/taxa_species.rds",
+    output:
+        abundance_table = "results/abundance_table_rdp.csv",
+    log:
+        "logs/make_abundance_table_rdp.log",
+    params:
+        samples = SAMPLES,
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/make_abundance_table.R"
+
+
+rule build_tree:
+    input:
+        seqtab_nochim = "results/seqtab_nochim.rds",
+        taxa_species  = "results/taxa/silva/taxa_species.rds",
+    output:
+        tree_rds = "results/tree/tree.rds",
+        tree_nwk = "results/tree/tree.nwk",
+        tree_pdf = "results/tree/tree.pdf",
+    log:
+        "logs/build_tree.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/build_tree.R"

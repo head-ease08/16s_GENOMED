@@ -1,9 +1,14 @@
+log <- file(snakemake@log[[1]], open = "wt")
+sink(log)
+sink(log, type = "message")
+
 library(dada2)
+
 saveRDS(
-    assignTaxonomy(
+    addSpecies(
         readRDS(snakemake@input$taxa),
-        readRDS(snakemake@input$silva),
-        tryRC       = TRUE
+        snakemake@input$silva,
+        tryRC = TRUE
     ),
     snakemake@output$taxa
 )
