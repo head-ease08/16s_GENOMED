@@ -8,6 +8,16 @@ TRIMMED_DIR = "data/trimmed"
 PRIMERS_DIR = "primers"
 REF_DIR     = "references"
 
+# Alignment-based QC (rules at the bottom of this file, target: qc_align_all).
+# Reuses the SILVA training-set FASTA already required for assign_taxonomy_silva.
+SILVA_TRAINSET = REF_DIR + "/silva_nr99_v138.2_toSpecies_trainset.fa.gz"
+QC_ALIGN_DIR   = "results/qc_align"
+BAM_DIR        = QC_ALIGN_DIR + "/bam"
+FLAGSTAT_DIR   = QC_ALIGN_DIR + "/flagstat"
+DIMERS_DIR     = QC_ALIGN_DIR + "/adapter_dimers"
+COV_DIR        = QC_ALIGN_DIR + "/coverage"
+COMP_DIR       = QC_ALIGN_DIR + "/composition"
+
 FILTER_INPUT = RAW_DIR if config.get("skip_trimming") else TRIMMED_DIR
 
 # Sample discovery: RAW_DIR/{sample_dir}/*_R1*.fq.gz + *_R2*.fq.gz.
@@ -375,3 +385,290 @@ rule build_tree:
         "envs/dada2.yaml"
     script:
         "scripts/build_tree.R"
+
+
+# =====================================================================
+# Alignment-based QC (opt-in — not in `rule all`, run explicitly:
+#   snakemake --cores N --use-conda qc_align_all
+# Maps DADA2-filtered reads (data/qc/{sample}_R[12].fq.gz) against the
+# SILVA training-set FASTA with bwa-mem2, then derives generic
+# alignment/coverage QC metrics the same way QC_pipe_frag does for WGS.
+# Reference headers there are bare taxonomy strings with no accession, and
+# many entries share an identical lineage — prep_silva_reference.sh gives
+# every record a unique contig id and keeps id->lineage in a side TSV so
+# bwa-mem2 gets unique reference names and taxon_mapping_composition.py can
+# still recover taxonomy after the fact.
+# =====================================================================
+
+rule prep_silva_reference:
+    input:
+        SILVA_TRAINSET,
+    output:
+        fasta = REF_DIR + "/silva_for_alignment.fasta",
+        map   = REF_DIR + "/silva_for_alignment.map.tsv",
+    log:
+        "logs/prep_silva_reference.log",
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        "bash scripts/prep_silva_reference.sh {input} {output.fasta} {output.map} "
+        "> {log} 2>&1"
+
+
+rule build_silva_index:
+    input:
+        REF_DIR + "/silva_for_alignment.fasta",
+    output:
+        REF_DIR + "/silva_for_alignment.fasta.bwt.2bit.64",
+    log:
+        "logs/build_silva_index.log",
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        "bwa-mem2 index {input} > {log} 2>&1"
+
+
+rule align_silva:
+    input:
+        r1  = QC_DIR + "/{sample}_R1.fq.gz",
+        r2  = QC_DIR + "/{sample}_R2.fq.gz",
+        ref = REF_DIR + "/silva_for_alignment.fasta",
+        idx = REF_DIR + "/silva_for_alignment.fasta.bwt.2bit.64",
+    output:
+        bam = BAM_DIR + "/{sample}.bam",
+        bai = BAM_DIR + "/{sample}.bam.bai",
+    log:
+        "logs/align_silva/{sample}.log",
+    threads: config.get("align_threads", 8)
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        """
+        mkdir -p {BAM_DIR}
+        bash scripts/align_silva.sh {input.ref} {input.r1} {input.r2} \
+            {output.bam} {wildcards.sample} {threads} > {log} 2>&1
+        """
+
+
+rule flagstat:
+    input:
+        bam = BAM_DIR + "/{sample}.bam",
+    output:
+        txt = FLAGSTAT_DIR + "/{sample}.flagstat.txt",
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        """
+        mkdir -p {FLAGSTAT_DIR}
+        samtools flagstat {input.bam} > {output.txt}
+        """
+
+
+rule flagstat_summary:
+    input:
+        expand(FLAGSTAT_DIR + "/{sample}.flagstat.txt", sample=SAMPLES),
+    output:
+        tsv = QC_ALIGN_DIR + "/alignment_summary.tsv",
+    run:
+        with open(output.tsv, "w") as out:
+            out.write("Sample\tReads_mapped\tAlignment_reads_%\tReads_duplicated_%\n")
+            for f in input:
+                sample = os.path.basename(f).replace(".flagstat.txt", "")
+                total = mapped = pct = dup = "NA"
+                with open(f) as fh:
+                    lines = fh.read().splitlines()
+                for line in lines:
+                    if " in total " in line:
+                        total = line.split()[0]
+                    if " duplicates" in line:
+                        dup = line.split()[0]
+                    if " mapped (" in line and "primary" not in line and "mate" not in line:
+                        parts = line.split()
+                        mapped = parts[0]
+                        for p in parts:
+                            if "%" in p:
+                                pct = p.replace("(", "").replace("%", "")
+                                break
+                dup_pct = "NA"
+                try:
+                    dup_pct = f"{float(dup) / float(total) * 100:.2f}"
+                except (ValueError, ZeroDivisionError):
+                    pass
+                out.write(f"{sample}\t{mapped}\t{pct}\t{dup_pct}\n")
+
+
+rule gc_content:
+    input:
+        expand(BAM_DIR + "/{sample}.bam", sample=SAMPLES),
+    output:
+        tsv = QC_ALIGN_DIR + "/gc_content.tsv",
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        "bash scripts/gc_content.sh {BAM_DIR} {output.tsv}"
+
+
+rule insert_size_summary:
+    input:
+        expand(BAM_DIR + "/{sample}.bam", sample=SAMPLES),
+    output:
+        tsv = QC_ALIGN_DIR + "/insert_size_summary.tsv",
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        "bash scripts/insert_size_peak.sh {BAM_DIR} {output.tsv}"
+
+
+rule read_length_summary:
+    input:
+        expand(QC_DIR + "/{sample}_R1.fq.gz", sample=SAMPLES),
+        expand(QC_DIR + "/{sample}_R2.fq.gz", sample=SAMPLES),
+    output:
+        tsv = QC_ALIGN_DIR + "/read_length_summary.tsv",
+    params:
+        samples = SAMPLES,
+    shell:
+        "bash scripts/read_length_summary.sh {QC_DIR} {output.tsv} {params.samples}"
+
+
+# SG-protocol linked adapter (Illumina universal, see QC_pipe_frag/config.yaml
+# protocols.SG.cutadapt_linked) — override with --config cutadapt_linked_adapter=...
+# if a different library-prep adapter was used.
+rule adapter_dimers:
+    input:
+        r1 = lambda wc: SAMPLES_DICT[wc.sample]["R1"],
+    output:
+        log  = DIMERS_DIR + "/{sample}.log",
+        json = DIMERS_DIR + "/{sample}.json",
+    params:
+        linked = config.get(
+            "cutadapt_linked_adapter",
+            "ACACTCTTCCCTACACGACGCTCTCCGATCTTT...GATCGGAAGAGCACACGTCTGAACTCCAGTC",
+        ),
+    threads: config.get("threads", 4)
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        """
+        mkdir -p {DIMERS_DIR}
+        cutadapt \
+            -g "{params.linked}" \
+            --discard-untrimmed \
+            --minimum-length 20 \
+            -o /dev/null \
+            --json {output.json} \
+            -j {threads} \
+            {input.r1} \
+            > {output.log} 2>&1
+        """
+
+
+rule adapter_dimers_summary:
+    input:
+        expand(DIMERS_DIR + "/{sample}.log", sample=SAMPLES),
+    output:
+        tsv = QC_ALIGN_DIR + "/adapter_dimers_summary.tsv",
+    shell:
+        """
+        echo -e "Sample\\tTotal_reads\\tReads_with_both_adapters\\tAdapter_dimers\\tAdapter_dimers_%" > {output.tsv}
+        for log in {input}; do
+            sample=$(basename "$log" .log)
+            total=$(grep "Total reads processed:" "$log" | awk '{{gsub(",","",$NF); print $NF}}')
+            with_adapters=$(grep "Reads with adapters:" "$log" | awk '{{gsub(",","",$4); print $4}}')
+            dimers=$(grep "Reads that were too short:" "$log" | awk '{{gsub(",","",$NF); print $NF}}')
+            pct=$(awk -v d="$dimers" -v t="$total" 'BEGIN {{if(t>0) printf "%.4f", d/t*100; else print "NA"}}')
+            echo -e "${{sample}}\\t${{total}}\\t${{with_adapters}}\\t${{dimers}}\\t${{pct}}" >> {output.tsv}
+        done
+        """
+
+
+rule coverage_metrics:
+    input:
+        bam = BAM_DIR + "/{sample}.bam",
+        bai = BAM_DIR + "/{sample}.bam.bai",
+    output:
+        tsv = COV_DIR + "/{sample}_coverage.tsv",
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        """
+        mkdir -p {COV_DIR}
+        python scripts/coverage_metrics.py {input.bam} {output.tsv}
+        """
+
+
+rule coverage_summary:
+    input:
+        expand(COV_DIR + "/{sample}_coverage.tsv", sample=SAMPLES),
+    output:
+        tsv = QC_ALIGN_DIR + "/coverage_summary.tsv",
+    shell:
+        """
+        head -1 {input[0]} > {output.tsv}
+        for f in {input}; do
+            tail -n +2 "$f" >> {output.tsv}
+        done
+        """
+
+
+rule taxon_mapping_composition:
+    input:
+        bam = BAM_DIR + "/{sample}.bam",
+        bai = BAM_DIR + "/{sample}.bam.bai",
+        map = REF_DIR + "/silva_for_alignment.map.tsv",
+    output:
+        tsv = COMP_DIR + "/{sample}_mapped_composition.tsv",
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        """
+        mkdir -p {COMP_DIR}
+        python scripts/taxon_mapping_composition.py {input.bam} {input.map} {output.tsv}
+        """
+
+
+rule mapped_composition_summary:
+    input:
+        expand(COMP_DIR + "/{sample}_mapped_composition.tsv", sample=SAMPLES),
+    output:
+        tsv = QC_ALIGN_DIR + "/mapped_composition_summary.tsv",
+    shell:
+        """
+        head -1 {input[0]} > {output.tsv}
+        for f in {input}; do
+            tail -n +2 "$f" >> {output.tsv}
+        done
+        """
+
+
+rule build_qc_table:
+    input:
+        track       = "results/track.csv",
+        read_length = QC_ALIGN_DIR + "/read_length_summary.tsv",
+        flagstat    = QC_ALIGN_DIR + "/alignment_summary.tsv",
+        gc          = QC_ALIGN_DIR + "/gc_content.tsv",
+        insert_size = QC_ALIGN_DIR + "/insert_size_summary.tsv",
+        dimers      = QC_ALIGN_DIR + "/adapter_dimers_summary.tsv",
+        coverage    = QC_ALIGN_DIR + "/coverage_summary.tsv",
+    output:
+        tsv = QC_ALIGN_DIR + "/final_qc_metrics.tsv",
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        """
+        python scripts/build_qc_table.py \
+            --track {input.track} \
+            --read_length {input.read_length} \
+            --flagstat {input.flagstat} \
+            --gc {input.gc} \
+            --insert_size {input.insert_size} \
+            --dimers {input.dimers} \
+            --coverage {input.coverage} \
+            --out {output.tsv}
+        """
+
+
+rule qc_align_all:
+    input:
+        QC_ALIGN_DIR + "/final_qc_metrics.tsv",
+        QC_ALIGN_DIR + "/mapped_composition_summary.tsv",

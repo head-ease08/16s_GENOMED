@@ -1,0 +1,13 @@
+name: qc_align
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python >=3.9
+  - bwa-mem2
+  - samtools >=1.15
+  - mosdepth
+  - cutadapt >=3.0
+  - parallel
+  - numpy
