@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import glob
 
 RAW_DIR     = "data/raw"
 QC_DIR      = "data/qc"
@@ -9,11 +10,37 @@ REF_DIR     = "references"
 
 FILTER_INPUT = RAW_DIR if config.get("skip_trimming") else TRIMMED_DIR
 
-SAMPLES, = glob_wildcards(f"{RAW_DIR}/{{sample}}_R1.fq.gz")
+# Sample discovery: RAW_DIR/{sample_dir}/*_R1*.fq.gz + *_R2*.fq.gz.
+# Same logic as QC_pipe_frag/Snakefile discover_samples() — one subfolder
+# per sample, filenames inside need not follow {sample}_R1.fq.gz.
+SAMPLE_DIR_GLOB = config.get("sample_dir_glob", "*")
+R1_GLOB = config.get("r1_glob", "*[Rr]1*.f*q*.gz")
+R2_GLOB = config.get("r2_glob", "*[Rr]2*.f*q*.gz")
 
-for s in SAMPLES:
-    r2 = f"{RAW_DIR}/{s}_R2.fq.gz"
-    assert os.path.exists(r2), f"No paired R2 for {s}: {r2}"
+
+def discover_samples():
+    samples = {}
+    for d in sorted(glob.glob(os.path.join(RAW_DIR, SAMPLE_DIR_GLOB))):
+        if not os.path.isdir(d):
+            continue
+        name = os.path.basename(d)
+        r1 = glob.glob(os.path.join(d, R1_GLOB))
+        r2 = glob.glob(os.path.join(d, R2_GLOB))
+        if not r1:
+            print(f"WARNING: {name} - no R1, skipping")
+            continue
+        if not r2:
+            print(f"WARNING: {name} - no R2, skipping")
+            continue
+        samples[name] = {"R1": r1[0], "R2": r2[0]}
+    return samples
+
+
+SAMPLES_DICT = discover_samples()
+SAMPLES = list(SAMPLES_DICT.keys())
+
+if not SAMPLES:
+    raise ValueError(f"No samples found in {RAW_DIR} matching {SAMPLE_DIR_GLOB}")
 
 
 rule all:
@@ -44,8 +71,8 @@ rule revcomp_primers:
 
 rule trim_primers:
     input:
-        r1     = RAW_DIR + "/{sample}_R1.fq.gz",
-        r2     = RAW_DIR + "/{sample}_R2.fq.gz",
+        r1     = lambda wc: SAMPLES_DICT[wc.sample]["R1"],
+        r2     = lambda wc: SAMPLES_DICT[wc.sample]["R2"],
         fwd    = PRIMERS_DIR + "/fwd_primers.fasta",
         rev    = PRIMERS_DIR + "/rev_primers.fasta",
         fwd_rc = PRIMERS_DIR + "/fwd_rc.fasta",
@@ -69,8 +96,8 @@ rule trim_primers:
 
 rule quality_per_sample:
     input:
-        r1 = expand(f"{RAW_DIR}/{{sample}}_R1.fq.gz", sample=SAMPLES),
-        r2 = expand(f"{RAW_DIR}/{{sample}}_R2.fq.gz", sample=SAMPLES),
+        r1 = [SAMPLES_DICT[s]["R1"] for s in SAMPLES],
+        r2 = [SAMPLES_DICT[s]["R2"] for s in SAMPLES],
     output:
         r1_pdf = f"{QC_DIR}/per_sample_forward.pdf",
         r2_pdf = f"{QC_DIR}/per_sample_reverse.pdf",
@@ -84,8 +111,8 @@ rule quality_per_sample:
 
 rule quality_aggregated:
     input:
-        r1 = expand(f"{RAW_DIR}/{{sample}}_R1.fq.gz", sample=SAMPLES),
-        r2 = expand(f"{RAW_DIR}/{{sample}}_R2.fq.gz", sample=SAMPLES),
+        r1 = [SAMPLES_DICT[s]["R1"] for s in SAMPLES],
+        r2 = [SAMPLES_DICT[s]["R2"] for s in SAMPLES],
     output:
         r1_pdf = f"{QC_DIR}/aggregated_forward.pdf",
         r2_pdf = f"{QC_DIR}/aggregated_reverse.pdf",
