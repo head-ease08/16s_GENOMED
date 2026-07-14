@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 import glob
 
-RAW_DIR     = "data/raw"
+RAW_DIR     = config.get("run_dir", "data/raw")
 QC_DIR      = "data/qc"
 TRIMMED_DIR = "data/trimmed"
 PRIMERS_DIR = "primers"
