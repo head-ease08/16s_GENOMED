@@ -106,10 +106,17 @@ def main():
 
             fp = fastp.get(s)
             if fp:
-                row["Raw total sequences"] = fp.get("Raw total sequences", row["Raw total sequences"])
-                row["Reads passed filters"] = fp.get("Reads passed filters", row["Reads passed filters"])
+                # accept either fastp_summary.py's column names or the
+                # underscore-style names from a quick jq/manual table
+                row["Raw total sequences"] = fp.get(
+                    "Raw total sequences", fp.get("Raw_total_sequences", row["Raw total sequences"])
+                )
+                row["Reads passed filters"] = fp.get(
+                    "Reads passed filters", fp.get("Reads_passed_filters", row["Reads passed filters"])
+                )
                 row["Average read length (after filtering)"] = fp.get(
-                    "Average read length (after filtering)", row["Average read length (after filtering)"]
+                    "Average read length (after filtering)",
+                    fp.get("Avg_read_length", row["Average read length (after filtering)"]),
                 )
 
             ins = insert_size.get(s, {})
