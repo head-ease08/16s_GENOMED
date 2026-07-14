@@ -9,5 +9,6 @@ dependencies:
   - samtools >=1.15
   - mosdepth
   - cutadapt >=3.0
+  - fastp
   - parallel
   - numpy

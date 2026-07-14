@@ -7,8 +7,16 @@ The SILVA reference has tens of thousands of entries; a sample's reads only
 ever hit a handful of them. Running mosdepth over the whole reference would
 drown every stat in zero-coverage bases from contigs that were never in this
 sample, making Mean_Coverage ~0 and Bases_0x ~100% regardless of how well the
-detected organisms are actually covered. So: subset the BAM to covered
-contigs first, then run mosdepth on that subset.
+detected organisms are actually covered.
+
+Earlier version tried to subset the BAM (samtools view -b bam <contigs>) and
+then trim the header to match. That's wrong: BAM alignment records store
+their reference as a numeric index into the @SQ list, not by name. Dropping
+@SQ lines renumbers everything after them, so every read's refID silently
+points at the wrong contig (or an out-of-range one) after reheadering --
+that's what made `samtools index` fail. No BAM surgery needed: mosdepth's
+`-b <bed>` restricts BOTH per-base and summary output to the listed regions
+directly on the original, untouched, already-indexed BAM.
 
 Usage: coverage_metrics.py <sample.bam> <output_tsv>
 """
@@ -28,17 +36,19 @@ def main():
     sample = os.path.basename(bam).split(".")[0]
     workdir = os.path.dirname(out_tsv) or "."
     os.makedirs(workdir, exist_ok=True)
-    subset_bam = os.path.join(workdir, f"{sample}.covered.bam")
+    bed_path = os.path.join(workdir, f"{sample}.covered.bed")
     prefix = os.path.join(workdir, f"{sample}.mosdepth")
 
     idxstats = subprocess.run(
         ["samtools", "idxstats", bam], check=True, capture_output=True, text=True
     ).stdout
-    covered = [
-        line.split("\t")[0]
-        for line in idxstats.splitlines()
-        if line and int(line.split("\t")[2]) > 0
-    ]
+    covered = []
+    for line in idxstats.splitlines():
+        if not line:
+            continue
+        ref_name, length, mapped, _unmapped = line.split("\t")
+        if int(mapped) > 0:
+            covered.append((ref_name, int(length)))
 
     if not covered:
         with open(out_tsv, "w") as f:
@@ -46,10 +56,11 @@ def main():
             f.write(f"{sample}\tNA\tNA\tNA\tNA\n")
         return
 
-    with open(subset_bam, "wb") as f:
-        subprocess.run(["samtools", "view", "-b", bam] + covered, check=True, stdout=f)
-    subprocess.run(["samtools", "index", subset_bam], check=True)
-    subprocess.run(["mosdepth", "-x", "-t", "4", prefix, subset_bam], check=True)
+    with open(bed_path, "w") as f:
+        for ref_name, length in covered:
+            f.write(f"{ref_name}\t0\t{length}\n")
+
+    subprocess.run(["mosdepth", "-x", "-t", "4", "-b", bed_path, prefix, bam], check=True)
 
     per_base = prefix + ".per-base.bed.gz"
     depths, weights = [], []
@@ -76,16 +87,17 @@ def main():
 
     for ext in (
         ".mosdepth.global.dist.txt",
+        ".mosdepth.region.dist.txt",
         ".mosdepth.summary.txt",
         ".per-base.bed.gz",
         ".per-base.bed.gz.csi",
+        ".regions.bed.gz",
+        ".regions.bed.gz.csi",
     ):
         fp = prefix + ext
         if os.path.exists(fp):
             os.remove(fp)
-    os.remove(subset_bam)
-    if os.path.exists(subset_bam + ".bai"):
-        os.remove(subset_bam + ".bai")
+    os.remove(bed_path)
 
 
 if __name__ == "__main__":

@@ -55,6 +55,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--track", required=True)
     ap.add_argument("--read_length", required=True)
+    ap.add_argument(
+        "--fastp",
+        default=None,
+        help="fastp_summary.py output — overrides Raw total sequences / "
+        "Reads passed filters / Average read length with fastp-based values "
+        "(QC_pipe_frag-comparable) instead of track.csv/read_length_summary.tsv",
+    )
     ap.add_argument("--flagstat", required=True)
     ap.add_argument("--gc", required=True)
     ap.add_argument("--insert_size", required=True)
@@ -65,6 +72,7 @@ def main():
 
     track = load_track(args.track)
     read_length = load_tsv(args.read_length)
+    fastp = load_tsv(args.fastp) if args.fastp else {}
     flagstat = load_tsv(args.flagstat)
     gc = load_tsv(args.gc)
     insert_size = load_tsv(args.insert_size)
@@ -72,7 +80,7 @@ def main():
     coverage = load_tsv(args.coverage)
 
     all_samples = sorted(
-        set(track) | set(read_length) | set(flagstat) | set(gc)
+        set(track) | set(read_length) | set(fastp) | set(flagstat) | set(gc)
         | set(insert_size) | set(dimers) | set(coverage)
     )
 
@@ -95,6 +103,14 @@ def main():
             row["Reads mapped"] = fs.get("Reads_mapped", "NA")
             row["Alignment reads_%"] = fs.get("Alignment_reads_%", "NA")
             row["Reads duplicated_%"] = fs.get("Reads_duplicated_%", "NA")
+
+            fp = fastp.get(s)
+            if fp:
+                row["Raw total sequences"] = fp.get("Raw total sequences", row["Raw total sequences"])
+                row["Reads passed filters"] = fp.get("Reads passed filters", row["Reads passed filters"])
+                row["Average read length (after filtering)"] = fp.get(
+                    "Average read length (after filtering)", row["Average read length (after filtering)"]
+                )
 
             ins = insert_size.get(s, {})
             row["Insert size peak"] = ins.get("Insert_size_peak", "NA")
