@@ -954,6 +954,8 @@ rule region_remove_chimera:
         sequence_table = REGION_DIR + "/{region}/seqtab.rds",
     output:
         seq_tab_nochim = REGION_DIR + "/{region}/seqtab_nochim.rds",
+    wildcard_constraints:
+        region = "|".join(ALL_REGIONS),
     log:
         "logs/region_remove_chimera/{region}.log",
     conda:
@@ -968,6 +970,8 @@ rule region_assign_taxonomy_silva:
         silva         = SILVA_TRAINSET,
     output:
         taxa = REGION_DIR + "/{region}/taxa/silva/taxa.rds",
+    wildcard_constraints:
+        region = "|".join(ALL_REGIONS),
     log:
         "logs/region_assign_taxonomy_silva/{region}.log",
     conda:
@@ -982,6 +986,8 @@ rule region_add_species_silva:
         silva = SILVA_SPECIES,
     output:
         taxa = REGION_DIR + "/{region}/taxa/silva/taxa_species.rds",
+    wildcard_constraints:
+        region = "|".join(ALL_REGIONS),
     log:
         "logs/region_add_species_silva/{region}.log",
     conda:
@@ -996,6 +1002,8 @@ rule region_assign_taxonomy_rdp:
         silva         = RDP_TRAINSET,
     output:
         taxa = REGION_DIR + "/{region}/taxa/rdp/taxa_species.rds",
+    wildcard_constraints:
+        region = "|".join(ALL_REGIONS),
     log:
         "logs/region_assign_taxonomy_rdp/{region}.log",
     conda:
@@ -1012,6 +1020,8 @@ rule region_abundance_table_silva:
         abundance_table = REGION_DIR + "/{region}/abundance_table_silva.csv",
     params:
         samples = SAMPLES,
+    wildcard_constraints:
+        region = "|".join(ALL_REGIONS),
     log:
         "logs/region_abundance_table_silva/{region}.log",
     conda:
@@ -1028,6 +1038,8 @@ rule region_abundance_table_rdp:
         abundance_table = REGION_DIR + "/{region}/abundance_table_rdp.csv",
     params:
         samples = SAMPLES,
+    wildcard_constraints:
+        region = "|".join(ALL_REGIONS),
     log:
         "logs/region_abundance_table_rdp/{region}.log",
     conda:
@@ -1146,3 +1158,67 @@ rule region_decontam_all:
     input:
         expand(REGION_DIR + "/{region}/decontam/abundance_table_silva.csv", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/decontam/abundance_table_rdp.csv", region=ALL_REGIONS),
+
+
+# =====================================================================
+# Post-filter (opt-in — not in `rule all`/`region_dada2_all`/`region_decontam_all`,
+# run explicitly: snakemake --cores N --use-conda region_postfilter_all
+# On top of decontam: drop non-Bacteria/Archaea + Mitochondria/Chloroplast
+# ASVs (Kingdom filter, SILVA taxonomy used as the single reference so the
+# same ASV set feeds both the silva and rdp abundance tables), then drop
+# ASVs seen in fewer than 2 samples (prevalence filter -- chained on top of
+# the Kingdom filter, not overwriting it). No re-run of assignTaxonomy:
+# make_abundance_table.R already intersects seqtab columns against the
+# existing taxa_species.rds, so the smaller filtered ASV set just works.
+# =====================================================================
+
+rule region_postfilter:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/decontam/seqtab_nochim.rds",
+        taxa_species  = REGION_DIR + "/{region}/decontam/taxa/silva/taxa_species.rds",
+    output:
+        seqtab_clean = REGION_DIR + "/{region}/decontam/postfilter/seqtab_nochim.rds",
+    log:
+        "logs/region_postfilter/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/postfilter_taxa.R"
+
+
+rule region_postfilter_abundance_table_silva:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/decontam/postfilter/seqtab_nochim.rds",
+        taxa_species  = REGION_DIR + "/{region}/decontam/taxa/silva/taxa_species.rds",
+    output:
+        abundance_table = REGION_DIR + "/{region}/decontam/postfilter/abundance_table_silva.csv",
+    params:
+        samples = DECONTAM_SAMPLES,
+    log:
+        "logs/region_postfilter_abundance_table_silva/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/make_abundance_table.R"
+
+
+rule region_postfilter_abundance_table_rdp:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/decontam/postfilter/seqtab_nochim.rds",
+        taxa_species  = REGION_DIR + "/{region}/decontam/taxa/rdp/taxa_species.rds",
+    output:
+        abundance_table = REGION_DIR + "/{region}/decontam/postfilter/abundance_table_rdp.csv",
+    params:
+        samples = DECONTAM_SAMPLES,
+    log:
+        "logs/region_postfilter_abundance_table_rdp/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/make_abundance_table.R"
+
+
+rule region_postfilter_all:
+    input:
+        expand(REGION_DIR + "/{region}/decontam/postfilter/abundance_table_silva.csv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/decontam/postfilter/abundance_table_rdp.csv", region=ALL_REGIONS),
