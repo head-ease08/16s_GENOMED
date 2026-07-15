@@ -11,3 +11,4 @@ dependencies:
   - bioconductor-decipher
   - r-ape
   - bioconductor-ggtree
+  - bioconductor-decontam
