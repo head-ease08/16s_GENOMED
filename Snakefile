@@ -22,20 +22,26 @@ COMP_DIR       = QC_ALIGN_DIR + "/composition"
 # Multiplexed multi-V-region primer pool (see primers/*.fasta) can't go
 # through one pooled DADA2 run: learnErrors assumes one error model for one
 # amplicon length, and 2x151bp reads physically can't overlap-merge every
-# region's amplicon. Overlap = len(R1)+len(R2)-insert_len; only V1_V2 (~268bp
-# insert) and V9 (~100bp insert) leave positive overlap. V3_V4 (~407bp),
-# V4_V5 (~330bp), V6_V8 (~341bp) are too long for 2x151bp to ever meet in the
-# middle, regardless of truncLen -- those run DADA2 forward-read-only (no
-# merge step), all others use the normal merge pipeline.
+# region's amplicon. V3_V4 (~407bp insert), V4_V5 (~330bp), V6_V8 (~341bp)
+# are too long for 2x151bp to ever meet in the middle regardless of truncLen
+# -- those run DADA2 forward-read-only (no merge step). V9 (~132bp insert)
+# clearly merges. V1_V2 (~280bp insert) is borderline once primer removal is
+# accounted for (see truncLen note below) -- kept in the merge bucket for
+# now, but check its actual merge rate in results/region/V1_V2/merged/ once
+# this runs; if it's near-zero, move it to the SE bucket like the others.
+#
+# truncLen note: demux_region strips the primer with cutadapt BEFORE
+# filterAndTrim ever sees the read, so the truncLen budget is against the
+# post-primer-trim length (measured ~130bp for a 151bp raw read, not 151),
+# and filterAndTrim discards any read shorter than truncLen outright rather
+# than soft-trimming it. 125/120 leaves a small quality-trim margin under
+# that 130bp ceiling.
 REGION_PRIMERS = {
-    "V1_V2": {"fwd": "AGAGTTTGATCMTGGCTCAG",  "rev": "GGACCGTGTCTCAGTTCCAG",    "truncLen": (145, 140), "merge": True},
-    "V9":    {"fwd": "TGCCACGGTGAATACGTTCC",  "rev": "CCTTGTTACGACTTCACCCCA",  "truncLen": (100, 100), "merge": True},
-    # truncLen <=145: raw reads are 151bp, filterAndTrim discards any read
-    # shorter than truncLen entirely (not a soft trim) -- learned that one
-    # the hard way earlier in this pipeline.
-    "V3_V4": {"fwd": "CCTACGGGNGGCWGCAG",     "rev": "GGACTACHVGGGTATCTAATCC", "truncLen": 145,        "merge": False},
-    "V4_V5": {"fwd": "GGAGGGTGCAAGCGTTAATC",  "rev": "TTAACCTTGCGGCCGTACTC",   "truncLen": 145,        "merge": False},
-    "V6_V8": {"fwd": "CGGTGGAGCATGTGGTTTAA",  "rev": "AGTTGCAGACTCCAATCCGG",   "truncLen": 145,        "merge": False},
+    "V1_V2": {"fwd": "AGAGTTTGATCMTGGCTCAG",  "rev": "GGACCGTGTCTCAGTTCCAG",    "truncLen": (125, 120), "merge": True},
+    "V9":    {"fwd": "TGCCACGGTGAATACGTTCC",  "rev": "CCTTGTTACGACTTCACCCCA",  "truncLen": (125, 120), "merge": True},
+    "V3_V4": {"fwd": "CCTACGGGNGGCWGCAG",     "rev": "GGACTACHVGGGTATCTAATCC", "truncLen": 125,        "merge": False},
+    "V4_V5": {"fwd": "GGAGGGTGCAAGCGTTAATC",  "rev": "TTAACCTTGCGGCCGTACTC",   "truncLen": 125,        "merge": False},
+    "V6_V8": {"fwd": "CGGTGGAGCATGTGGTTTAA",  "rev": "AGTTGCAGACTCCAATCCGG",   "truncLen": 125,        "merge": False},
 }
 ALL_REGIONS    = list(REGION_PRIMERS.keys())
 MERGE_REGIONS  = [r for r, c in REGION_PRIMERS.items() if c["merge"]]
