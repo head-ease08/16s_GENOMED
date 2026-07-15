@@ -10,5 +10,6 @@ dependencies:
   - mosdepth
   - cutadapt >=3.0
   - fastp
+  - seqkit
   - parallel
   - numpy
