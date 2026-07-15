@@ -1072,6 +1072,7 @@ rule region_decontam:
         contam_stats    = REGION_DIR + "/{region}/decontam/contam_stats.rds",
     params:
         neg_samples = NEG_SAMPLES,
+        all_samples = SAMPLES,
     log:
         "logs/region_decontam/{region}.log",
     conda:

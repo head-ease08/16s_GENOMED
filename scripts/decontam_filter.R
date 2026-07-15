@@ -7,6 +7,13 @@ library(decontam)
 seqtab <- readRDS(snakemake@input$seqtab_nochim)
 neg_samples <- snakemake@params$neg_samples
 
+# seqtab_nochim.rds has no real sample rownames yet -- make_seqtable.R builds
+# it from an unnamed list (position order = params$all_samples), rownames
+# only ever get set inside make_abundance_table.R on its own in-memory copy,
+# never persisted back to this file. Without this, is_neg below is FALSE for
+# every row and no blank ever gets dropped.
+rownames(seqtab) <- snakemake@params$all_samples
+
 is_neg <- rownames(seqtab) %in% neg_samples
 cat("Negative controls found in seqtab:", sum(is_neg), "of", length(neg_samples), "expected\n")
 
