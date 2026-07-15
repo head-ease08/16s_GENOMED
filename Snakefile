@@ -18,6 +18,32 @@ DIMERS_DIR     = QC_ALIGN_DIR + "/adapter_dimers"
 COV_DIR        = QC_ALIGN_DIR + "/coverage"
 COMP_DIR       = QC_ALIGN_DIR + "/composition"
 
+# Per-region DADA2 (rules at the bottom, target: region_dada2_all).
+# Multiplexed multi-V-region primer pool (see primers/*.fasta) can't go
+# through one pooled DADA2 run: learnErrors assumes one error model for one
+# amplicon length, and 2x151bp reads physically can't overlap-merge every
+# region's amplicon. Overlap = len(R1)+len(R2)-insert_len; only V1_V2 (~268bp
+# insert) and V9 (~100bp insert) leave positive overlap. V3_V4 (~407bp),
+# V4_V5 (~330bp), V6_V8 (~341bp) are too long for 2x151bp to ever meet in the
+# middle, regardless of truncLen -- those run DADA2 forward-read-only (no
+# merge step), all others use the normal merge pipeline.
+REGION_PRIMERS = {
+    "V1_V2": {"fwd": "AGAGTTTGATCMTGGCTCAG",  "rev": "GGACCGTGTCTCAGTTCCAG",    "truncLen": (145, 140), "merge": True},
+    "V9":    {"fwd": "TGCCACGGTGAATACGTTCC",  "rev": "CCTTGTTACGACTTCACCCCA",  "truncLen": (100, 100), "merge": True},
+    # truncLen <=145: raw reads are 151bp, filterAndTrim discards any read
+    # shorter than truncLen entirely (not a soft trim) -- learned that one
+    # the hard way earlier in this pipeline.
+    "V3_V4": {"fwd": "CCTACGGGNGGCWGCAG",     "rev": "GGACTACHVGGGTATCTAATCC", "truncLen": 145,        "merge": False},
+    "V4_V5": {"fwd": "GGAGGGTGCAAGCGTTAATC",  "rev": "TTAACCTTGCGGCCGTACTC",   "truncLen": 145,        "merge": False},
+    "V6_V8": {"fwd": "CGGTGGAGCATGTGGTTTAA",  "rev": "AGTTGCAGACTCCAATCCGG",   "truncLen": 145,        "merge": False},
+}
+ALL_REGIONS    = list(REGION_PRIMERS.keys())
+MERGE_REGIONS  = [r for r, c in REGION_PRIMERS.items() if c["merge"]]
+SE_REGIONS     = [r for r, c in REGION_PRIMERS.items() if not c["merge"]]
+REGION_DIR     = "results/region"
+SILVA_SPECIES  = REF_DIR + "/silva_v138.2_assignSpecies.fa.gz"
+RDP_TRAINSET   = REF_DIR + "/rdp_19_toSpecies_trainset.fa.gz"
+
 FILTER_INPUT = RAW_DIR if config.get("skip_trimming") else TRIMMED_DIR
 
 # Sample discovery: RAW_DIR/{sample_dir}/*_R1*.fq.gz + *_R2*.fq.gz.
@@ -672,3 +698,329 @@ rule qc_align_all:
     input:
         QC_ALIGN_DIR + "/final_qc_metrics.tsv",
         QC_ALIGN_DIR + "/mapped_composition_summary.tsv",
+
+
+# =====================================================================
+# Per-region DADA2 (opt-in — not in `rule all`, run explicitly:
+#   snakemake --cores N --use-conda region_dada2_all
+# Demultiplexes raw reads by V-region primer pair, then runs a separate
+# DADA2 pipeline per region with a region-appropriate truncLen. V1_V2/V9
+# merge normally; V3_V4/V4_V5/V6_V8 can't physically overlap at 2x151bp
+# (see REGION_PRIMERS comment above) so those run forward-read-only.
+# =====================================================================
+
+rule demux_region:
+    input:
+        r1 = lambda wc: SAMPLES_DICT[wc.sample]["R1"],
+        r2 = lambda wc: SAMPLES_DICT[wc.sample]["R2"],
+    output:
+        r1 = REGION_DIR + "/{region}/trimmed/{sample}_R1.fq.gz",
+        r2 = REGION_DIR + "/{region}/trimmed/{sample}_R2.fq.gz",
+    params:
+        fwd = lambda wc: REGION_PRIMERS[wc.region]["fwd"],
+        rev = lambda wc: REGION_PRIMERS[wc.region]["rev"],
+    log:
+        "logs/demux_region/{region}/{sample}.log",
+    conda:
+        "envs/qc_align.yaml"
+    shell:
+        """
+        mkdir -p $(dirname {output.r1})
+        cutadapt -g {params.fwd} -G {params.rev} --discard-untrimmed -e 0.1 \
+            --minimum-length 50 -j 4 \
+            -o {output.r1} -p {output.r2} \
+            {input.r1} {input.r2} > {log} 2>&1
+        """
+
+
+# --- filter_reads: PE (merge regions) vs SE (forward-only regions) ---
+
+rule region_filter_reads:
+    input:
+        r1 = REGION_DIR + "/{region}/trimmed/{sample}_R1.fq.gz",
+        r2 = REGION_DIR + "/{region}/trimmed/{sample}_R2.fq.gz",
+    output:
+        r1    = REGION_DIR + "/{region}/qc/{sample}_R1.fq.gz",
+        r2    = REGION_DIR + "/{region}/qc/{sample}_R2.fq.gz",
+        stats = REGION_DIR + "/{region}/filter_stats/{sample}.rds",
+    params:
+        truncLen = lambda wc: REGION_PRIMERS[wc.region]["truncLen"],
+    wildcard_constraints:
+        region = "|".join(MERGE_REGIONS),
+    log:
+        "logs/region_filter_reads/{region}/{sample}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/region_filter_reads.R"
+
+
+rule region_filter_reads_se:
+    input:
+        r1 = REGION_DIR + "/{region}/trimmed/{sample}_R1.fq.gz",
+    output:
+        r1    = REGION_DIR + "/{region}/qc/{sample}_R1.fq.gz",
+        stats = REGION_DIR + "/{region}/filter_stats/{sample}.rds",
+    params:
+        truncLen = lambda wc: REGION_PRIMERS[wc.region]["truncLen"],
+    wildcard_constraints:
+        region = "|".join(SE_REGIONS),
+    log:
+        "logs/region_filter_reads/{region}/{sample}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/region_filter_reads_se.R"
+
+
+# --- error model: PE vs SE ---
+
+rule region_error_correction:
+    input:
+        r1 = expand(REGION_DIR + "/{{region}}/qc/{sample}_R1.fq.gz", sample=SAMPLES),
+        r2 = expand(REGION_DIR + "/{{region}}/qc/{sample}_R2.fq.gz", sample=SAMPLES),
+    output:
+        r1_rds = REGION_DIR + "/{region}/err_forward.rds",
+        r2_rds = REGION_DIR + "/{region}/err_reverse.rds",
+        r1_pdf = REGION_DIR + "/{region}/plots/error_model_forward.pdf",
+        r2_pdf = REGION_DIR + "/{region}/plots/error_model_reverse.pdf",
+    wildcard_constraints:
+        region = "|".join(MERGE_REGIONS),
+    log:
+        "logs/region_error_correction/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/error_correction_model.R"
+
+
+rule region_error_correction_se:
+    input:
+        r1 = expand(REGION_DIR + "/{{region}}/qc/{sample}_R1.fq.gz", sample=SAMPLES),
+    output:
+        r1_rds = REGION_DIR + "/{region}/err_forward.rds",
+        r1_pdf = REGION_DIR + "/{region}/plots/error_model_forward.pdf",
+    wildcard_constraints:
+        region = "|".join(SE_REGIONS),
+    log:
+        "logs/region_error_correction/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/error_correction_model_se.R"
+
+
+# --- dereplication: PE vs SE ---
+
+rule region_dereplication:
+    input:
+        r1 = REGION_DIR + "/{region}/qc/{sample}_R1.fq.gz",
+        r2 = REGION_DIR + "/{region}/qc/{sample}_R2.fq.gz",
+    output:
+        r1_rds = REGION_DIR + "/{region}/derep/{sample}_R1.rds",
+        r2_rds = REGION_DIR + "/{region}/derep/{sample}_R2.rds",
+    wildcard_constraints:
+        region = "|".join(MERGE_REGIONS),
+    log:
+        "logs/region_dereplication/{region}/{sample}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dereplication.R"
+
+
+rule region_dereplication_se:
+    input:
+        r1 = REGION_DIR + "/{region}/qc/{sample}_R1.fq.gz",
+    output:
+        r1_rds = REGION_DIR + "/{region}/derep/{sample}_R1.rds",
+    wildcard_constraints:
+        region = "|".join(SE_REGIONS),
+    log:
+        "logs/region_dereplication/{region}/{sample}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dereplication_se.R"
+
+
+# --- dada inference: PE vs SE ---
+
+rule region_dada2_inference:
+    input:
+        r1_rds     = REGION_DIR + "/{region}/derep/{sample}_R1.rds",
+        r2_rds     = REGION_DIR + "/{region}/derep/{sample}_R2.rds",
+        r1_err_rds = REGION_DIR + "/{region}/err_forward.rds",
+        r2_err_rds = REGION_DIR + "/{region}/err_reverse.rds",
+    output:
+        r1_rds = REGION_DIR + "/{region}/dada/{sample}_R1.rds",
+        r2_rds = REGION_DIR + "/{region}/dada/{sample}_R2.rds",
+    wildcard_constraints:
+        region = "|".join(MERGE_REGIONS),
+    log:
+        "logs/region_dada2_inference/{region}/{sample}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2_inference.R"
+
+
+rule region_dada2_inference_se:
+    input:
+        r1_rds     = REGION_DIR + "/{region}/derep/{sample}_R1.rds",
+        r1_err_rds = REGION_DIR + "/{region}/err_forward.rds",
+    output:
+        r1_rds = REGION_DIR + "/{region}/dada/{sample}_R1.rds",
+    wildcard_constraints:
+        region = "|".join(SE_REGIONS),
+    log:
+        "logs/region_dada2_inference/{region}/{sample}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2_inference_se.R"
+
+
+# --- seqtable: merge (PE) vs forward-only (SE) ---
+
+rule region_merge_reads:
+    input:
+        r1_rds_derep = REGION_DIR + "/{region}/derep/{sample}_R1.rds",
+        r2_rds_derep = REGION_DIR + "/{region}/derep/{sample}_R2.rds",
+        r1_rds_dada  = REGION_DIR + "/{region}/dada/{sample}_R1.rds",
+        r2_rds_dada  = REGION_DIR + "/{region}/dada/{sample}_R2.rds",
+    output:
+        merged_reads = REGION_DIR + "/{region}/merged/{sample}.rds",
+    wildcard_constraints:
+        region = "|".join(MERGE_REGIONS),
+    log:
+        "logs/region_merge_reads/{region}/{sample}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/merge_reads.R"
+
+
+rule region_make_seqtable:
+    input:
+        merged_reads = expand(REGION_DIR + "/{{region}}/merged/{sample}.rds", sample=SAMPLES),
+    output:
+        sequence_table = REGION_DIR + "/{region}/seqtab.rds",
+    wildcard_constraints:
+        region = "|".join(MERGE_REGIONS),
+    log:
+        "logs/region_make_seqtable/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/make_seqtable.R"
+
+
+rule region_make_seqtable_se:
+    input:
+        dada_fwd = expand(REGION_DIR + "/{{region}}/dada/{sample}_R1.rds", sample=SAMPLES),
+    output:
+        sequence_table = REGION_DIR + "/{region}/seqtab.rds",
+    wildcard_constraints:
+        region = "|".join(SE_REGIONS),
+    log:
+        "logs/region_make_seqtable/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/make_seqtable_se.R"
+
+
+# --- everything past here is region-agnostic (same format seqtab either way) ---
+
+rule region_remove_chimera:
+    input:
+        sequence_table = REGION_DIR + "/{region}/seqtab.rds",
+    output:
+        seq_tab_nochim = REGION_DIR + "/{region}/seqtab_nochim.rds",
+    log:
+        "logs/region_remove_chimera/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/remove_chimera.R"
+
+
+rule region_assign_taxonomy_silva:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/seqtab_nochim.rds",
+        silva         = SILVA_TRAINSET,
+    output:
+        taxa = REGION_DIR + "/{region}/taxa/silva/taxa.rds",
+    log:
+        "logs/region_assign_taxonomy_silva/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/assign_taxa.R"
+
+
+rule region_add_species_silva:
+    input:
+        taxa  = REGION_DIR + "/{region}/taxa/silva/taxa.rds",
+        silva = SILVA_SPECIES,
+    output:
+        taxa = REGION_DIR + "/{region}/taxa/silva/taxa_species.rds",
+    log:
+        "logs/region_add_species_silva/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/add_species.R"
+
+
+rule region_assign_taxonomy_rdp:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/seqtab_nochim.rds",
+        silva         = RDP_TRAINSET,
+    output:
+        taxa = REGION_DIR + "/{region}/taxa/rdp/taxa_species.rds",
+    log:
+        "logs/region_assign_taxonomy_rdp/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/assign_taxa.R"
+
+
+rule region_abundance_table_silva:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/seqtab_nochim.rds",
+        taxa_species  = REGION_DIR + "/{region}/taxa/silva/taxa_species.rds",
+    output:
+        abundance_table = REGION_DIR + "/{region}/abundance_table_silva.csv",
+    params:
+        samples = SAMPLES,
+    log:
+        "logs/region_abundance_table_silva/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/make_abundance_table.R"
+
+
+rule region_abundance_table_rdp:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/seqtab_nochim.rds",
+        taxa_species  = REGION_DIR + "/{region}/taxa/rdp/taxa_species.rds",
+    output:
+        abundance_table = REGION_DIR + "/{region}/abundance_table_rdp.csv",
+    params:
+        samples = SAMPLES,
+    log:
+        "logs/region_abundance_table_rdp/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/make_abundance_table.R"
+
+
+rule region_dada2_all:
+    input:
+        expand(REGION_DIR + "/{region}/abundance_table_silva.csv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/abundance_table_rdp.csv", region=ALL_REGIONS),

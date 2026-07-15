@@ -31,6 +31,12 @@ def main():
         ["samtools", "idxstats", bam], check=True, capture_output=True, text=True
     ).stdout
 
+    # Group by Genus+Species (last two ranks), not the full lineage string.
+    # SILVA has inconsistent higher-rank naming across entries for the same
+    # organism (e.g. "Proteobacteria" vs "Pseudomonadota" -- a historical
+    # phylum rename that both spellings still appear under in the DB), so
+    # grouping on the full string leaves the same species split across
+    # multiple rows with different counts instead of one summed total.
     counts = defaultdict(int)
     total_mapped = 0
     for line in idxstats.splitlines():
@@ -41,7 +47,9 @@ def main():
         if mapped == 0:
             continue
         lineage = id_to_lineage.get(ref_id, "unknown")
-        counts[lineage] += mapped
+        ranks = [r for r in lineage.rstrip(";").split(";") if r]
+        taxon = " ".join(ranks[-2:]) if len(ranks) >= 2 else (ranks[0] if ranks else "unknown")
+        counts[taxon] += mapped
         total_mapped += mapped
 
     with open(out_tsv, "w") as out:
@@ -49,9 +57,8 @@ def main():
         if total_mapped == 0:
             out.write(f"{sample}\tNA\t0\tNA\n")
             return
-        for lineage, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+        for taxon, n in sorted(counts.items(), key=lambda kv: -kv[1]):
             pct = n / total_mapped * 100
-            taxon = lineage.rstrip(";").replace(";", " ")
             out.write(f"{sample}\t{taxon}\t{n}\t{pct:.2f}\n")
 
 
