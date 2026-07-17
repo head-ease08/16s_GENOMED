@@ -55,8 +55,8 @@ data_plot   <- rev(data_ord)
 labels_plot <- rev(labels_ord)
 medians     <- rev(summary_df$median)
 png(file.path(out_dir, "insert_size_boxplot.png"),
-    width = 900, height = max(600, 25 * n), res = 120)
-par(mar = c(4, 4, 7, 2))
+    width = 1400, height = max(900, 45 * n), res = 130)
+par(mar = c(4, 5, 7, 2))
 boxplot(data_plot, names = labels_plot, horizontal = TRUE, las = 1, col = "steelblue",
         outline = TRUE, pch = 20, cex = 0.4,
         main = "Insert size by sample", xlab = "Insert size (bp)", ylab = "Sample")
