@@ -14,27 +14,59 @@ data <- setNames(lapply(files, function(f) {
     x[is.finite(x) & x > 0]
 }), samples)
 
-# clip at 99th percentile (pooled) so a few outliers don't blow out the x-axis
-pooled <- unlist(data, use.names = FALSE)
-xmax <- if (length(pooled)) quantile(pooled, 0.99, names = FALSE) else 1000
+for (s in samples) {
+    cat(sprintf("%-40s n=%d %s\n", s, length(data[[s]]),
+                if (length(data[[s]])) paste("range", min(data[[s]]), "-", max(data[[s]])) else ""))
+}
+
+# Per-sample clip at that SAME sample's own 99th percentile -- not a pooled
+# one. A pooled/global xmax silently emptied out any sample whose scale
+# differed from the rest (e.g. one sample mostly short junk fragments while
+# others are normal-length): x[x <= global_xmax] could drop ~all of that
+# sample's own points, rendering a blank-looking plot despite the txt file
+# having data.
+plot_hist <- function(x, main, xlim = NULL) {
+    if (length(x) == 0) {
+        plot.new(); title(paste(main, "- no data")); return(invisible())
+    }
+    own_xmax <- quantile(x, 0.99, names = FALSE)
+    xv <- x[x <= own_xmax]
+    if (length(xv) == 0) xv <- x  # degenerate: fall back to unclipped
+    if (length(unique(xv)) < 2) {
+        # single repeated value -- hist() can choke on this, draw a bar manually.
+        # Keep the axis tight around the value (not a fixed 0..N range) so the
+        # bar is wide enough on-screen to actually be visible, not a 1px hairline.
+        center <- xv[1]
+        span <- max(5, center * 0.05)
+        plot_xlim <- if (!is.null(xlim)) xlim else c(center - span, center + span)
+        bar_w <- diff(plot_xlim) * 0.02
+        plot(1, type = "n", xlim = plot_xlim,
+             ylim = c(0, length(xv)), xlab = "Insert size (bp)", ylab = "Frequency", main = main)
+        rect(center - bar_w, 0, center + bar_w, length(xv), col = "steelblue", border = NA)
+    } else if (is.null(xlim)) {
+        hist(xv, breaks = min(100, length(unique(xv))), col = "steelblue", border = NA,
+             main = main, xlab = "Insert size (bp)")
+    } else {
+        hist(xv, breaks = min(100, length(unique(xv))), col = "steelblue", border = NA,
+             main = main, xlab = "Insert size (bp)", xlim = xlim)
+    }
+    abline(v = median(x), col = "red", lty = 2)
+}
 
 # per-sample PNGs
 for (s in samples) {
     x <- data[[s]]
     png(file.path(out_dir, paste0(s, ".insert_size_hist.png")), width = 900, height = 600, res = 120)
-    if (length(x) == 0) {
-        plot.new(); title(paste(s, "- no data"))
-    } else {
-        hist(x[x <= xmax], breaks = 100, col = "steelblue", border = NA,
-             main = paste("Insert size -", s), xlab = "Insert size (bp)")
-        abline(v = median(x), col = "red", lty = 2)
-        legend("topright", legend = sprintf("median = %d", as.integer(median(x))),
+    plot_hist(x, paste("Insert size -", s))
+    if (length(x) > 0) {
+        legend("topright", legend = sprintf("median = %d, n = %d", as.integer(median(x)), length(x)),
                col = "red", lty = 2, bty = "n")
     }
     dev.off()
 }
 
-# combined grid, one panel per sample, shared x-axis for easy comparison
+# combined grid, one panel per sample -- each panel auto-scales to its own
+# data (no shared xlim: samples can legitimately live on different scales)
 n <- length(samples)
 ncol <- ceiling(sqrt(n))
 nrow <- ceiling(n / ncol)
@@ -42,13 +74,7 @@ png(file.path(out_dir, "insert_size_hist_all.png"),
     width = 400 * ncol, height = 300 * nrow, res = 120)
 par(mfrow = c(nrow, ncol), mar = c(4, 4, 2, 1))
 for (s in samples) {
-    x <- data[[s]]
-    if (length(x) == 0) {
-        plot.new(); title(paste(s, "- no data")); next
-    }
-    hist(x[x <= xmax], breaks = 100, col = "steelblue", border = NA,
-         main = s, xlab = "Insert size (bp)", xlim = c(0, xmax))
-    abline(v = median(x), col = "red", lty = 2)
+    plot_hist(data[[s]], s)
 }
 dev.off()
 
