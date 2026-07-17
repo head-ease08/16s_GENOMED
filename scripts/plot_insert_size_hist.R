@@ -85,4 +85,25 @@ for (s in samples) {
 }
 dev.off()
 
-cat("Wrote", n, "per-sample PNGs and insert_size_hist_all.png to", out_dir, "\n")
+# second grid: same panels, but on a SHARED x-axis so peak position is
+# directly comparable across samples (like the boxplot, but with the actual
+# distribution shape visible, not just the IQR box). Range is computed
+# dynamically from the real pooled data (0.5th-99.5th pctile, not a fixed
+# guess) so it's wide enough to not blank out a sample that sits at a
+# different scale than the rest -- it'll just look narrow in that panel,
+# same tradeoff a shared axis always has, but never empty.
+pooled <- unlist(data, use.names = FALSE)
+if (length(pooled) > 0) {
+    shared_xlim <- quantile(pooled, c(0.005, 0.995), names = FALSE)
+    if (diff(shared_xlim) == 0) shared_xlim <- shared_xlim + c(-5, 5)
+    png(file.path(out_dir, "insert_size_hist_all_shared_axis.png"),
+        width = 400 * ncol, height = 300 * nrow, res = 120)
+    par(mfrow = c(nrow, ncol), mar = c(4, 4, 2, 1))
+    for (s in samples) {
+        plot_hist(data[[s]], label_of[[s]], xlim = shared_xlim)
+    }
+    dev.off()
+}
+
+cat("Wrote", n, "per-sample PNGs, insert_size_hist_all.png (own-scale) and",
+    "insert_size_hist_all_shared_axis.png (shared scale) to", out_dir, "\n")

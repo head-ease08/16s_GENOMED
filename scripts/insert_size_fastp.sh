@@ -55,4 +55,5 @@ fi
 
 Rscript "$SCRIPT_DIR/plot_insert_size_hist.R" "$OUT_DIR"
 Rscript "$SCRIPT_DIR/plot_insert_size_boxplot.R" "$OUT_DIR"
+Rscript "$SCRIPT_DIR/plot_insert_size_density.R" "$OUT_DIR"
 echo "Done. Histograms in $OUT_DIR" >&2
