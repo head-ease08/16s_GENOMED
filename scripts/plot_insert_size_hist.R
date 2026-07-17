@@ -4,15 +4,21 @@
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) < 1) stop("Usage: plot_insert_size_hist.R <dir>")
 out_dir <- args[1]
+source(file.path(dirname(sub("--file=", "", grep("--file=", commandArgs(trailingOnly = FALSE), value = TRUE))), "insert_size_sample_order.R"))
 
 files <- list.files(out_dir, pattern = "\\.insert_sizes\\.txt$", full.names = TRUE)
 if (length(files) == 0) stop("No *.insert_sizes.txt files found in ", out_dir)
 
-samples <- sub("\\.insert_sizes\\.txt$", "", basename(files))
+samples_raw <- sub("\\.insert_sizes\\.txt$", "", basename(files))
 data <- setNames(lapply(files, function(f) {
     x <- scan(f, what = numeric(), quiet = TRUE)
     x[is.finite(x) & x > 0]
-}), samples)
+}), samples_raw)
+
+ord_info <- sample_order_and_labels(samples_raw)
+samples <- samples_raw[ord_info$order]      # sample names, in display order
+labels  <- ord_info$labels                  # e.g. "1","2",...,"28" (or full name if pattern didn't match)
+label_of <- setNames(labels, samples)
 
 for (s in samples) {
     cat(sprintf("%-40s n=%d %s\n", s, length(data[[s]]),
@@ -53,11 +59,12 @@ plot_hist <- function(x, main, xlim = NULL) {
     abline(v = median(x), col = "red", lty = 2)
 }
 
-# per-sample PNGs
+# per-sample PNGs -- filename keeps the real sample name (traceability),
+# on-image title shows just the short numeric label
 for (s in samples) {
     x <- data[[s]]
     png(file.path(out_dir, paste0(s, ".insert_size_hist.png")), width = 900, height = 600, res = 120)
-    plot_hist(x, paste("Insert size -", s))
+    plot_hist(x, paste("Insert size - Sample", label_of[[s]]))
     if (length(x) > 0) {
         legend("topright", legend = sprintf("median = %d, n = %d", as.integer(median(x)), length(x)),
                col = "red", lty = 2, bty = "n")
@@ -65,8 +72,8 @@ for (s in samples) {
     dev.off()
 }
 
-# combined grid, one panel per sample -- each panel auto-scales to its own
-# data (no shared xlim: samples can legitimately live on different scales)
+# combined grid, one panel per sample, in sample-number order (1,2,3...
+# not alphabetical) -- each panel auto-scales to its own data
 n <- length(samples)
 ncol <- ceiling(sqrt(n))
 nrow <- ceiling(n / ncol)
@@ -74,7 +81,7 @@ png(file.path(out_dir, "insert_size_hist_all.png"),
     width = 400 * ncol, height = 300 * nrow, res = 120)
 par(mfrow = c(nrow, ncol), mar = c(4, 4, 2, 1))
 for (s in samples) {
-    plot_hist(data[[s]], s)
+    plot_hist(data[[s]], label_of[[s]])
 }
 dev.off()
 
