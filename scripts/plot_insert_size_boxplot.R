@@ -46,14 +46,24 @@ summary_df <- do.call(rbind, lapply(seq_along(samples_ord), function(i) {
 write.csv(summary_df, file.path(out_dir, "insert_size_summary.csv"), row.names = FALSE)
 print(summary_df, row.names = FALSE)
 
-# boxplot, width scales with sample count so labels don't collide
+# horizontal boxplot (one row per sample, top = sample 1) -- height scales
+# with sample count so rows don't collide. boxplot(horizontal=TRUE) draws
+# the first group at the BOTTOM by default, so reverse everything to get
+# sample 1 at the top / 28 at the bottom (reading order).
 n <- length(samples_ord)
+data_plot   <- rev(data_ord)
+labels_plot <- rev(labels_ord)
+medians     <- rev(summary_df$median)
 png(file.path(out_dir, "insert_size_boxplot.png"),
-    width = max(900, 40 * n), height = 600, res = 120)
-par(mar = c(5, 4, 3, 1))
-boxplot(data_ord, names = labels_ord, las = 1, col = "steelblue",
+    width = 900, height = max(600, 25 * n), res = 120)
+par(mar = c(4, 4, 7, 2))
+boxplot(data_plot, names = labels_plot, horizontal = TRUE, las = 1, col = "steelblue",
         outline = TRUE, pch = 20, cex = 0.4,
-        main = "Insert size by sample", xlab = "Sample", ylab = "Insert size (bp)")
+        main = "Insert size by sample", xlab = "Insert size (bp)", ylab = "Sample")
+# mark each sample's own median as a tick + numeric label on its own axis
+# (top), not just the (hard to read exactly) line inside the box
+axis(3, at = medians, labels = round(medians, 1), las = 2, cex.axis = 0.6,
+     col = "red", col.axis = "red", tick = TRUE)
 dev.off()
 
 cat("Wrote insert_size_boxplot.png and insert_size_summary.csv to", out_dir, "\n")
