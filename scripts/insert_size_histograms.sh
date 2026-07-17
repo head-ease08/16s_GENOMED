@@ -49,5 +49,6 @@ fi
 Rscript "$(dirname "$0")/plot_insert_size_hist.R" "$OUT_DIR"
 Rscript "$(dirname "$0")/plot_insert_size_boxplot.R" "$OUT_DIR"
 Rscript "$(dirname "$0")/plot_insert_size_density.R" "$OUT_DIR"
+Rscript "$(dirname "$0")/plot_insert_size_violin.R" "$OUT_DIR"
 
 echo "Histograms written to $OUT_DIR"
