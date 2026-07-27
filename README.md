@@ -80,20 +80,28 @@ conda install -c bioconda "cutadapt>=3.0"
 
 ## Input format
 
-Raw reads go in `data/raw/`. Required naming pattern:
+Raw reads go in `data/raw/`, **one subfolder per sample**:
 
 ```
-{sample}_R1.fq.gz
-{sample}_R2.fq.gz
+data/raw/{sample}/{anything}_R1{anything}.fq.gz
+data/raw/{sample}/{anything}_R2{anything}.fq.gz
 ```
 
-`{sample}` must not contain underscores before `_R1` / `_R2`. Example:
+The subfolder name becomes the sample name; filenames inside it don't need to follow any strict pattern (matched via `*[Rr]1*.f*q*.gz` / `*[Rr]2*.f*q*.gz`, see `discover_samples()` in `Snakefile`). Example:
 ```
-SRR123456_R1.fq.gz   SRR123456_R2.fq.gz
-patient01_R1.fq.gz   patient01_R2.fq.gz
+data/raw/SRR123456/SRR123456_R1.fq.gz   data/raw/SRR123456/SRR123456_R2.fq.gz
+data/raw/patient01/patient01_R1.fq.gz   data/raw/patient01/patient01_R2.fq.gz
 ```
 
-The pipeline asserts at startup that every `_R1.fq.gz` has a matching `_R2.fq.gz`.
+If raw reads instead come flat (`{sample}_R1.fq.gz` / `{sample}_R2.fq.gz` directly in one directory), nest them into per-sample subfolders first with `scripts/nest_raw_samples.sh` (symlinks, doesn't copy):
+```bash
+scripts/nest_raw_samples.sh <flat_dir> data/raw
+```
+
+Conversely, `scripts/flatten_raw_samples.sh` goes the other way (subfolder-per-sample → flat), for the standalone scripts (`demux_regions.sh`, `batch_align.sh`, `standalone_align.sh`) that expect a flat directory:
+```bash
+scripts/flatten_raw_samples.sh data/raw <flat_out_dir>
+```
 
 ---
 
