@@ -8,7 +8,7 @@ REV_FASTA="$4"
 
 THREADS="${THREADS:-4}"
 MIN_LEN="${MIN_LEN:-50}"
-ERROR_RATE="${ERROR_RATE:-0.2}"
+ERROR_RATE="${ERROR_RATE:-0.1}"
 
 mkdir -p "$OUTPUT_DIR" "$OUTPUT_DIR/logs"
 
@@ -66,7 +66,6 @@ for r1 in "${R1_FILES[@]}"; do
         -A "file:$FWD_RC_FASTA" \
         -n 2 \
         -e "$ERROR_RATE" \
-        -O 12 \
         --discard-untrimmed \
         --minimum-length "$MIN_LEN" \
         -j "$THREADS" \
