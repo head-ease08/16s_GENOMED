@@ -1,23 +1,58 @@
+---
+title: "16S rRNA DADA2 pipeline (paired-end, interactive)"
+output: html_document
+---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-## Loading data and running QC
 
-Load packages, set working directory and random seed.
+## Overview
+
+Interactive, chunk-by-chunk equivalent of the Snakemake pipeline (see the
+repo's `README.md` and `Snakefile`) for a single paired-end 16S run: primer
+trimming, quality filtering, DADA2 denoising, chimera removal, taxonomy
+(SILVA + RDP), an ASV abundance table, a composition plot, and a phylogenetic
+tree, assembled into a `phyloseq` object. Run it from RStudio ("Run Cell") or
+render it end to end with:
+
+```
+Rscript -e "rmarkdown::render('scripts/dada2_paired_with_tree.Rmd')"
+```
+
+Expects raw reads in the working directory matching `{sample}_R1*.fq*` /
+`{sample}_R2*.fq*`, plus `sample-metadata.tsv` and `manifest.tsv` for the
+`phyloseq` sample data. Reference databases and primer FASTAs are read from
+the repository (`references/`, `primers/`) via `repo_root` below.
+
+## Setup
+
+Load packages, set the working directory, seed, and paths to the shared
+repo resources (references / primers) so the rest of the notebook can use
+them regardless of which run directory it's launched from.
 
 ```{r results='hide', message=FALSE, warning=FALSE}
 require(dada2)
 require(phyloseq)
 require(Biostrings)
 require(ggplot2)
-require(DECIPHER)   
-require(phangorn)   # for phylogenetic tree construction
-require(ape)        # tree manipulation / I/O
+require(tidyr)
+require(DECIPHER)   # alignment + tree building
+require(ggtree)      # tree visualization
+require(ape)          # tree manipulation / I/O
 
 set.seed(42)
 setwd('./')
+
+# Path to the pipeline repository root (contains scripts/, primers/,
+# references/). Adjust if this notebook's working directory sits somewhere
+# other than one level below the repo root.
+repo_root  <- ".."
+ref_dir    <- file.path(repo_root, "references")
+primer_dir <- file.path(repo_root, "primers")
 ```
+
+## Loading data and running QC
 
 ```{r}
 path = "./"
@@ -25,7 +60,7 @@ path = "./"
 forward.raw <- sort(list.files(path, pattern = "_R1.*\\.fq", full.names = TRUE))
 reverse.raw <- sort(list.files(path, pattern = "_R2.*\\.fq", full.names = TRUE))
 
-# must be same number 
+# must be same number
 stopifnot(length(forward.raw) == length(reverse.raw))
 
 # extract names
@@ -35,17 +70,37 @@ sample.names <- unname(sample.names)
 sample.names
 ```
 
+Per-sample quality profiles (subsampled to 50k reads each):
+
 ```{r warning=FALSE}
 plotQualityProfile(forward.raw, n = 50000)
 plotQualityProfile(reverse.raw, n = 50000)
 ```
+
+Aggregated quality profiles across all samples (100k reads):
 
 ```{r warning=FALSE}
 plotQualityProfile(forward.raw, aggregate = TRUE, n = 100000)
 plotQualityProfile(reverse.raw, aggregate = TRUE, n = 100000)
 ```
 
-## Cutadapt
+## Primer trimming (cutadapt)
+
+Strips primers with `scripts/run_cutadapt.sh` (the interactive counterpart
+of the Snakemake `trim_primers` rule) before DADA2 ever sees the reads.
+Run this once per dataset — re-running is safe but redundant, so it's
+`eval=FALSE` by default; flip to `eval=TRUE` or run the chunk manually.
+
+```{r cutadapt-run, eval=FALSE}
+dir.create("trimmed_reads", showWarnings = FALSE)
+system2("bash",
+        c(file.path(repo_root, "scripts", "run_cutadapt.sh"),
+          ".", "trimmed_reads",
+          file.path(primer_dir, "fwd_primers.fasta"),
+          file.path(primer_dir, "rev_primers.fasta")))
+```
+
+Load the trimmed reads and the per-sample summary it produced:
 
 ```{r}
 path <- "./trimmed_reads"
@@ -56,7 +111,36 @@ reverse.cut <- sort(list.files(path, pattern = "_R2\\.fq\\.gz$", full.names = TR
 ```{r}
 cutadapt_summary <- read.table("trimmed_reads/cutadapt_summary.tsv",
                                header = TRUE, sep = "\t")
+cutadapt_summary
 ```
+
+## Filter and trim
+
+`filterAndTrim` on the primer-trimmed reads — same parameters as
+`scripts/filter_reads.R` (`truncLen = c(120, 120)`). Inspect the quality
+profiles above and lower `truncLen` if reads are lost heavily here; R1 +
+R2 truncated lengths must sum to more than amplicon length + required
+overlap (see README Troubleshooting).
+
+```{r}
+filt_path <- "filtered"
+forward.qc <- file.path(filt_path, paste0(sample.names, "_R1.fq.gz"))
+reverse.qc <- file.path(filt_path, paste0(sample.names, "_R2.fq.gz"))
+names(forward.qc) <- sample.names
+names(reverse.qc) <- sample.names
+
+qc.out <- filterAndTrim(forward.cut, forward.qc,
+                        reverse.cut, reverse.qc,
+                        truncLen    = c(120, 120),
+                        maxN        = 0,
+                        maxEE       = c(2, 2),
+                        truncQ      = 2,
+                        rm.phix     = TRUE,
+                        compress    = TRUE,
+                        multithread = TRUE)
+qc.out
+```
+
 ## Error model
 
 Train a parametric error model **separately** for forward and reverse reads
@@ -102,8 +186,14 @@ dim(sequence.table)
 table(nchar(getSequences(sequence.table)))
 ```
 
-Optionally, restrict to the expected amplicon length range to remove obvious
-non-target sequences:
+### Length filtering (optional)
+
+Restrict to the expected amplicon length range to remove obvious
+non-target sequences. Set the range from the `table()` output above and the
+expected length of the primer set actually used (V3-V4 ~460bp, V1-V2/V9
+~250-300bp, etc.) — the 400:430 default below assumes a V3-V4-length
+amplicon and should be adjusted otherwise. If you skip this chunk, use
+`sequence.table` instead of `seqtab.lenfilt` in Chimera removal below.
 
 ```{r}
 seqtab.lenfilt <- sequence.table[, nchar(colnames(sequence.table)) %in% 400:430]
@@ -142,23 +232,184 @@ write.csv(track, "results/track.csv", row.names = TRUE)
 
 ## Taxonomy assignment
 
+### SILVA (genus-level + species)
+
+Matches `scripts/assign_taxa.R` + `scripts/add_species.R`
+(SILVA v138.2, from Zenodo — see README "Reference databases").
+
 ```{r}
 taxa <- assignTaxonomy(seqtab.nochim,
-                       "./silva_nr_v132_train_set.fa.gz",
+                       file.path(ref_dir, "silva_nr99_v138.2_toSpecies_trainset.fa.gz"),
                        multithread = TRUE, tryRC = TRUE)
 taxa <- addSpecies(taxa,
-                   "./silva_species_assignment_v132.fa.gz",
+                   file.path(ref_dir, "silva_v138.2_assignSpecies.fa.gz"),
                    tryRC = TRUE)
+
+dir.create("results/taxa/silva", showWarnings = FALSE, recursive = TRUE)
+saveRDS(taxa, "results/taxa/silva/taxa_species.rds")
+head(taxa)
 ```
 
-## Phylogenetic tree (DECIPHER + phangorn)
+### RDP (alternative, single-step)
 
+Matches `scripts/assign_taxa.R` as used by the `assign_taxonomy_rdp` rule:
+the RDP 19 training set already resolves to species, so no separate
+`addSpecies` call is needed.
 
+```{r}
+taxa.rdp <- assignTaxonomy(seqtab.nochim,
+                           file.path(ref_dir, "rdp_19_toSpecies_trainset.fa.gz"),
+                           multithread = TRUE, tryRC = TRUE)
+
+dir.create("results/taxa/rdp", showWarnings = FALSE, recursive = TRUE)
+saveRDS(taxa.rdp, "results/taxa/rdp/taxa_species.rds")
+head(taxa.rdp)
+```
+
+### Post-filter taxonomy (optional)
+
+Matches `scripts/postfilter_taxa.R`: drop non-Bacteria/Archaea and
+mitochondrial/chloroplast ASVs (Kingdom filter using SILVA taxonomy), then
+drop low-abundance and low-prevalence ASVs. Produces `seqtab.clean`
+without overwriting `seqtab.nochim` — swap it in downstream (abundance
+table, tree, phyloseq) if you want the filtered set.
+
+```{r}
+is_bacteria <- taxa[, "Kingdom"] %in% c("Bacteria", "Archaea") &
+    !(taxa[, "Family"] %in% c("Mitochondria")) &
+    !(taxa[, "Order"] %in% c("Chloroplast"))
+is_bacteria[is.na(is_bacteria)] <- FALSE
+
+seqtab.kingdom <- seqtab.nochim[, is_bacteria, drop = FALSE]
+cat("Kingdom/organelle filter: kept", ncol(seqtab.kingdom), "of", ncol(seqtab.nochim), "ASVs\n")
+
+MIN_ABUNDANCE <- 10
+seqtab.abund <- seqtab.kingdom[, colSums(seqtab.kingdom) >= MIN_ABUNDANCE, drop = FALSE]
+cat("Abundance>=", MIN_ABUNDANCE, " filter: kept ", ncol(seqtab.abund), " of ",
+    ncol(seqtab.kingdom), " ASVs\n", sep = "")
+
+seqtab.clean <- seqtab.abund[, colSums(seqtab.abund > 0) >= 2, drop = FALSE]
+cat("Prevalence>=2 filter: kept", ncol(seqtab.clean), "of", ncol(seqtab.abund), "ASVs\n")
+```
+
+## Abundance table
+
+Per-ASV counts, relative abundance, and taxonomy in one table — matches
+`scripts/make_abundance_table.R`.
+
+```{r}
+counts <- t(seqtab.nochim)
+shared <- intersect(rownames(counts), rownames(taxa))
+counts.shared <- counts[shared, , drop = FALSE]
+taxa.shared   <- taxa[shared, , drop = FALSE]
+
+relabund <- sweep(counts.shared, 2, colSums(counts.shared), "/") * 100
+colnames(relabund) <- paste0(colnames(counts.shared), "_pct")
+
+abundance <- cbind(
+    asv_id   = paste0("ASV", seq_len(nrow(counts.shared))),
+    sequence = shared,
+    as.data.frame(taxa.shared),
+    as.data.frame(counts.shared),
+    as.data.frame(relabund)
+)
+
+write.csv(abundance, "results/abundance_table_silva.csv", row.names = FALSE)
+head(abundance)
+```
+
+## Taxonomic composition plot
+
+Matches `scripts/plot_composition.R`: aggregates genus-level relative
+abundance by V-region and plots a stacked bar chart. Needs an SRA-style
+metadata CSV with `Run` and `Sample Name` columns (the latter encoding the
+V-region, e.g. `..._V3-V4`) — only meaningful when a study spans multiple
+V-regions per sample set. Left `eval=FALSE`; flip to `eval=TRUE` once
+`meta_csv` points at a real file.
+
+```{r composition-plot, eval=FALSE}
+top_n    <- 20
+meta_csv <- "sra_metadata.csv"
+
+meta    <- read.csv(meta_csv, check.names = FALSE, stringsAsFactors = FALSE)
+srr_col  <- "Run"
+name_col <- "Sample Name"
+
+extract_vregion <- function(x) {
+    m <- regmatches(x, regexpr("V\\d+(-V\\d+)*$", x))
+    ifelse(length(m) == 0, x, m)
+}
+meta$vregion <- sapply(meta[[name_col]], extract_vregion)
+srr_to_vregion <- setNames(meta$vregion, meta[[srr_col]])
+
+common <- intersect(rownames(seqtab.nochim), names(srr_to_vregion))
+seqtab.plot <- seqtab.nochim[common, , drop = FALSE]
+group <- srr_to_vregion[common]
+
+taxa_df <- as.data.frame(taxa)
+genus <- ifelse(
+    !is.na(taxa_df$Genus),    taxa_df$Genus,
+    ifelse(!is.na(taxa_df$Family), paste0("unknown_", taxa_df$Family),
+    ifelse(!is.na(taxa_df$Order),  paste0("unknown_", taxa_df$Order),
+                                   "unassigned"))
+)
+names(genus) <- rownames(taxa_df)
+
+counts <- t(seqtab.plot)
+shared <- intersect(rownames(counts), names(genus))
+counts <- counts[shared, , drop = FALSE]
+genus  <- genus[shared]
+
+vregions   <- sort(unique(group))
+agg_counts <- sapply(vregions, function(vr) {
+    cols <- names(group)[group == vr]
+    cols <- intersect(cols, colnames(counts))
+    if (length(cols) == 1) counts[, cols]
+    else rowSums(counts[, cols, drop = FALSE])
+})
+colnames(agg_counts) <- vregions
+
+genus_counts <- rowsum(agg_counts, group = genus)
+relabund     <- sweep(genus_counts, 2, colSums(genus_counts), "/") * 100
+
+sorted   <- sort(rowSums(relabund), decreasing = TRUE)
+top_taxa <- names(sorted)[seq_len(min(top_n, length(sorted)))]
+top_taxa <- top_taxa[top_taxa %in% rownames(relabund)]
+
+rest  <- rownames(relabund)[!rownames(relabund) %in% top_taxa]
+other <- if (length(rest) > 0) colSums(relabund[rest, , drop = FALSE]) else rep(0, ncol(relabund))
+
+plot_mat <- rbind(relabund[top_taxa, , drop = FALSE], other = other)
+df       <- as.data.frame(plot_mat)
+df$taxon <- factor(rownames(df), levels = rev(c(top_taxa, "other")))
+df_long  <- pivot_longer(df, cols = -taxon, names_to = "vregion", values_to = "pct")
+df_long$vregion <- factor(df_long$vregion, levels = vregions)
+
+comp_plot <- ggplot(df_long, aes(x = vregion, y = pct, fill = taxon)) +
+    geom_bar(stat = "identity", width = 0.8) +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, 100)) +
+    labs(x = NULL, y = "Relative abundance (%)", fill = NULL) +
+    theme_bw(base_size = 11) +
+    theme(
+        axis.text.x        = element_text(angle = 45, hjust = 1),
+        legend.position    = "right",
+        panel.grid.major.x = element_blank()
+    )
+
+ggsave("results/plots/composition_silva.pdf", comp_plot, width = 14, height = 7)
+comp_plot
+```
+
+## Phylogenetic tree (DECIPHER + ggtree)
+
+Same approach as `scripts/build_tree.R` (DECIPHER `AlignSeqs` + `Treeline`,
+NJ under a GTR model) so it only needs the packages already declared in
+`envs/dada2.yaml` (no `phangorn` dependency).
 
 ```{r message=FALSE, warning=FALSE}
 # Pull ASV sequences from the chimera-free table
 seqs <- getSequences(seqtab.nochim)
-names(seqs) <- seqs   # required by phangorn downstream
+names(seqs) <- seqs   # required downstream for tip labeling
 
 # Multiple sequence alignment
 alignment <- AlignSeqs(DNAStringSet(seqs),
@@ -166,31 +417,45 @@ alignment <- AlignSeqs(DNAStringSet(seqs),
                        processors = NULL,
                        verbose = FALSE)
 
-# Convert to phangorn format
-phang.align <- phyDat(as(alignment, "matrix"), type = "DNA")
+# NJ tree under a GTR model
+tree_dend <- Treeline(alignment,
+                      method  = "NJ",
+                      model   = "GTR",
+                      verbose = FALSE)
 
-# Distance matrix and NJ starting tree
-dm     <- dist.ml(phang.align)
-treeNJ <- NJ(dm)
-
-# ML optimization under GTR+G+I
-fit    <- pml(treeNJ, data = phang.align)
-fitGTR <- update(fit, k = 4, inv = 0.2)
-fitGTR <- optim.pml(fitGTR,
-                    model         = "GTR",
-                    optInv        = TRUE,
-                    optGamma      = TRUE,
-                    rearrangement = "stochastic",
-                    control       = pml.control(trace = 0))
+asv.tree <- as.phylo(as.hclust(tree_dend))
 
 # Save the tree for reuse
-dir.create("results", showWarnings = FALSE)
-ape::write.tree(fitGTR$tree, file = "results/asv_tree.nwk")
+dir.create("results/tree", showWarnings = FALSE, recursive = TRUE)
+saveRDS(asv.tree, "results/tree/tree.rds")
+write.tree(asv.tree, "results/tree/tree.nwk")
 ```
 
-## Build the phyloseq object (now with a tree)
+Visualize the tree with taxonomy-labeled tips (Genus + Species where
+available, colored by Phylum):
 
-Prepare metadata as before.
+```{r fig.width=12, fig.height=14, message=FALSE, warning=FALSE}
+tree_taxa <- as.data.frame(taxa)
+tree_taxa <- tree_taxa[, !duplicated(colnames(tree_taxa)), drop = FALSE]
+tree_taxa <- cbind(label = rownames(tree_taxa), tree_taxa)
+
+tree_taxa$tip_label <- ifelse(
+    !is.na(tree_taxa$Species), paste(tree_taxa$Genus, tree_taxa$Species),
+    ifelse(!is.na(tree_taxa$Genus), tree_taxa$Genus,
+    ifelse(!is.na(tree_taxa$Family), tree_taxa$Family, tree_taxa$Order)))
+
+tree_plot <- ggtree(asv.tree) %<+% tree_taxa +
+    geom_tiplab(aes(label = tip_label, color = Phylum), size = 2.5, align = TRUE) +
+    theme_tree2() +
+    theme(legend.position = "bottom")
+
+ggsave("results/tree/tree.pdf", tree_plot, width = 12, height = 14)
+tree_plot
+```
+
+## Build the phyloseq object (with tree)
+
+Prepare metadata (QIIME2-style `sample-metadata.tsv` + `manifest.tsv`).
 
 ```{r}
 metadata <- read.table(file = "sample-metadata.tsv",
@@ -207,13 +472,13 @@ rownames(resulting_table) <- merged_table$absolute.filepath
 resulting_table <- resulting_table[, -1]
 ```
 
-Assemble the phyloseq object — this time including the tree.
+Assemble the phyloseq object, including the tree.
 
 ```{r}
 ps <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows = FALSE),
                sample_data(resulting_table),
                tax_table(taxa),
-               phy_tree(fitGTR$tree))
+               phy_tree(asv.tree))
 ```
 
 Replace long DNA strings with short ASV IDs (DNA preserved in `refseq`).
@@ -226,6 +491,8 @@ taxa_names(ps) <- paste0("ASV", seq(ntaxa(ps)))
 ps
 ```
 
+## Phylogenetic diversity (optional)
+
 Now phylogenetic metrics are available, e.g.:
 
 ```{r eval=FALSE}
@@ -237,4 +504,3 @@ Now phylogenetic metrics are available, e.g.:
 unifrac.uw <- UniFrac(ps, weighted = FALSE)
 unifrac.w  <- UniFrac(ps, weighted = TRUE)
 ```
-
