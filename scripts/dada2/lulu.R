@@ -7,7 +7,7 @@ if (!requireNamespace("lulu", quietly = TRUE)) {
 }
 library(lulu)
 
-otu_tab   <- read.table(snakemake@input$otu_table,  header = TRUE, row.names = 1, sep = "\t", check.names = FALSE)
+otu_tab   <- read.table(snakemake@input$otu_table,  header = TRUE, row.names = 1, sep = "\t", check.names = FALSE, comment.char = "")
 match_tab <- read.table(snakemake@input$match_list, header = FALSE, sep = "\t")
 
 curated <- lulu(otu_tab, match_tab)
