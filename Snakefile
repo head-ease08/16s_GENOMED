@@ -1233,15 +1233,23 @@ rule region_postfilter_all:
 #   snakemake --cores N --use-conda otu_clustering_all
 # Per-region, post-decontam/postfilter seqtab_nochim.rds converted to FASTA
 # (asv2fa.R writes one record per ASV, header carries ";size=<total
-# abundance>" for vsearch --sizein), then vsearch clusters ASVs into
-# 97%-identity OTUs, self-BLAST builds the match list, LULU curates.
+# abundance summed across all samples>" for vsearch --sizein/--sizeout --
+# vsearch clusters on sequence identity only, doesn't care about
+# per-sample structure). vsearch clusters ASVs into 97%-identity OTUs;
+# its --otutabout table is pooled-abundance-by-ASV, used ONLY as a
+# cluster membership map (otu_sample_table.R), never as real counts --
+# LULU needs a real OTU x sample table to curate on actual co-occurrence,
+# which otu_sample_table.R builds by re-aggregating the original
+# per-sample seqtab_nochim.rds (real samples) by OTU cluster assignment.
+# self-BLAST builds the match list, LULU curates the real table.
 # =====================================================================
 
 rule asv2fa:
     input:
         seqtab_nochim = REGION_DIR + "/{region}/decontam/postfilter/seqtab_nochim.rds",
     output:
-        fasta = REGION_DIR + "/{region}/otu/asv.fasta",
+        fasta   = REGION_DIR + "/{region}/otu/asv.fasta",
+        asv_map = REGION_DIR + "/{region}/otu/asv_map.tsv",
     log:
         "logs/asv2fa/{region}.log",
     conda:
@@ -1303,9 +1311,26 @@ rule blast_match_list:
         """
 
 
+rule otu_sample_table:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/decontam/postfilter/seqtab_nochim.rds",
+        asv_map       = REGION_DIR + "/{region}/otu/asv_map.tsv",
+        otu_table     = REGION_DIR + "/{region}/otu/otu_table.tsv",
+    output:
+        otu_sample_table = REGION_DIR + "/{region}/otu/otu_sample_table.tsv",
+    params:
+        samples = DECONTAM_SAMPLES,
+    log:
+        "logs/otu_sample_table/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2/otu_sample_table.R"
+
+
 rule run_lulu:
     input:
-        otu_table  = REGION_DIR + "/{region}/otu/otu_table.tsv",
+        otu_table  = REGION_DIR + "/{region}/otu/otu_sample_table.tsv",
         match_list = REGION_DIR + "/{region}/otu/match_list.txt",
     output:
         lulu_result   = REGION_DIR + "/{region}/otu/lulu_result.rds",
@@ -1326,7 +1351,8 @@ rule asv2fa_decontam:
     input:
         seqtab_nochim = REGION_DIR + "/{region}/decontam/seqtab_nochim.rds",
     output:
-        fasta = REGION_DIR + "/{region}/decontam/otu/asv.fasta",
+        fasta   = REGION_DIR + "/{region}/decontam/otu/asv.fasta",
+        asv_map = REGION_DIR + "/{region}/decontam/otu/asv_map.tsv",
     log:
         "logs/asv2fa_decontam/{region}.log",
     conda:
@@ -1388,9 +1414,26 @@ rule blast_match_list_decontam:
         """
 
 
+rule otu_sample_table_decontam:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/decontam/seqtab_nochim.rds",
+        asv_map       = REGION_DIR + "/{region}/decontam/otu/asv_map.tsv",
+        otu_table     = REGION_DIR + "/{region}/decontam/otu/otu_table.tsv",
+    output:
+        otu_sample_table = REGION_DIR + "/{region}/decontam/otu/otu_sample_table.tsv",
+    params:
+        samples = DECONTAM_SAMPLES,
+    log:
+        "logs/otu_sample_table_decontam/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2/otu_sample_table.R"
+
+
 rule run_lulu_decontam:
     input:
-        otu_table  = REGION_DIR + "/{region}/decontam/otu/otu_table.tsv",
+        otu_table  = REGION_DIR + "/{region}/decontam/otu/otu_sample_table.tsv",
         match_list = REGION_DIR + "/{region}/decontam/otu/match_list.txt",
     output:
         lulu_result   = REGION_DIR + "/{region}/decontam/otu/lulu_result.rds",
