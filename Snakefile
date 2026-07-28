@@ -25,10 +25,10 @@ COMP_DIR       = QC_ALIGN_DIR + "/composition"
 # region's amplicon. V3_V4 (~407bp insert), V4_V5 (~330bp), V6_V8 (~341bp)
 # are too long for 2x151bp to ever meet in the middle regardless of truncLen
 # -- those run DADA2 forward-read-only (no merge step). V9 (~132bp insert)
-# clearly merges. V1_V2 (~280bp insert) is borderline once primer removal is
-# accounted for (see truncLen note below) -- kept in the merge bucket for
-# now, but check its actual merge rate in results/region/V1_V2/merged/ once
-# this runs; if it's near-zero, move it to the SE bucket like the others.
+# clearly merges. V1_V2 (~280bp insert) was tried in the merge bucket but
+# measured 0% mergePairs success at truncLen (125,120) -- 245bp of usable
+# sequence can't span a ~280bp post-primer-trim insert. Moved to the SE
+# bucket like V3_V4/V4_V5/V6_V8.
 #
 # truncLen note: demux_region strips the primer with cutadapt BEFORE
 # filterAndTrim ever sees the read, so the truncLen budget is against the
@@ -37,7 +37,7 @@ COMP_DIR       = QC_ALIGN_DIR + "/composition"
 # than soft-trimming it. 125/120 leaves a small quality-trim margin under
 # that 130bp ceiling.
 REGION_PRIMERS = {
-    "V1_V2": {"fwd": "AGAGTTTGATCMTGGCTCAG",  "rev": "GGACCGTGTCTCAGTTCCAG",    "truncLen": (125, 120), "merge": True},
+    "V1_V2": {"fwd": "AGAGTTTGATCMTGGCTCAG",  "rev": "GGACCGTGTCTCAGTTCCAG",    "truncLen": 125,        "merge": False},
     "V9":    {"fwd": "TGCCACGGTGAATACGTTCC",  "rev": "CCTTGTTACGACTTCACCCCA",  "truncLen": (125, 120), "merge": True},
     "V3_V4": {"fwd": "CCTACGGGNGGCWGCAG",     "rev": "GGACTACHVGGGTATCTAATCC", "truncLen": 125,        "merge": False},
     "V4_V5": {"fwd": "GGAGGGTGCAAGCGTTAATC",  "rev": "TTAACCTTGCGGCCGTACTC",   "truncLen": 125,        "merge": False},
