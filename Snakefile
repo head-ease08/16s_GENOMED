@@ -1315,8 +1315,168 @@ rule run_lulu:
         "scripts/dada2/lulu.R"
 
 
+# Same OTU/LULU chain, run a second time directly on the decontam-stage
+# seqtab (no Kingdom/prevalence postfilter applied) -- gives an OTU table
+# from before that filtering, alongside the postfilter one above.
+
+rule asv2fa_decontam:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/decontam/seqtab_nochim.rds",
+    output:
+        fasta = REGION_DIR + "/{region}/decontam/otu/asv.fasta",
+    log:
+        "logs/asv2fa_decontam/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2/asv2fa.R"
+
+
+rule cluster_otus_decontam:
+    input:
+        fasta = REGION_DIR + "/{region}/decontam/otu/asv.fasta",
+    output:
+        otu_table = REGION_DIR + "/{region}/decontam/otu/otu_table.tsv",
+        centroids = REGION_DIR + "/{region}/decontam/otu/centroids.fasta",
+    log:
+        "logs/cluster_otus_decontam/{region}.log",
+    conda:
+        "envs/vsearch.yaml"
+    shell:
+        """
+        vsearch --cluster_size {input.fasta} --id 0.97 --sizein --sizeout \
+            --otutabout {output.otu_table} --centroids {output.centroids} \
+            > {log} 2>&1
+        """
+
+
+rule make_blastdb_decontam:
+    input:
+        centroids = REGION_DIR + "/{region}/decontam/otu/centroids.fasta",
+    output:
+        db_done = touch(REGION_DIR + "/{region}/decontam/otu/blastdb.done"),
+    log:
+        "logs/make_blastdb_decontam/{region}.log",
+    conda:
+        "envs/blast.yaml"
+    shell:
+        "makeblastdb -in {input.centroids} -parse_seqids -dbtype nucl > {log} 2>&1"
+
+
+rule blast_match_list_decontam:
+    input:
+        centroids = REGION_DIR + "/{region}/decontam/otu/centroids.fasta",
+        db_done   = REGION_DIR + "/{region}/decontam/otu/blastdb.done",
+    output:
+        match_list = REGION_DIR + "/{region}/decontam/otu/match_list.txt",
+    log:
+        "logs/blast_match_list_decontam/{region}.log",
+    threads: config.get("threads", 4)
+    conda:
+        "envs/blast.yaml"
+    shell:
+        """
+        blastn -db {input.centroids} -query {input.centroids} \
+            -outfmt '6 qseqid sseqid pident' \
+            -out {output.match_list} \
+            -qcov_hsp_perc 80 -perc_identity 84 \
+            -num_threads {threads} \
+            > {log} 2>&1
+        """
+
+
+rule run_lulu_decontam:
+    input:
+        otu_table  = REGION_DIR + "/{region}/decontam/otu/otu_table.tsv",
+        match_list = REGION_DIR + "/{region}/decontam/otu/match_list.txt",
+    output:
+        lulu_result   = REGION_DIR + "/{region}/decontam/otu/lulu_result.rds",
+        curated_table = REGION_DIR + "/{region}/decontam/otu/curated_otu_table.tsv",
+    log:
+        "logs/run_lulu_decontam/{region}.log",
+    conda:
+        "envs/lulu.yaml"
+    script:
+        "scripts/dada2/lulu.R"
+
+
+# =====================================================================
+# Curated OTU table x taxonomy join. LULU/vsearch never touch taxonomy --
+# match each OTU's centroid sequence back against the ASV-level
+# taxa_species.rds (assigned pre-postfilter, at the decontam stage) by
+# exact sequence, since asv2fa.R's "ASV<N>" ids are per-run labels, not
+# stable across the postfilter/decontam seqtabs.
+# =====================================================================
+
+rule otu_taxonomy_postfilter_silva:
+    input:
+        curated_table = REGION_DIR + "/{region}/otu/curated_otu_table.tsv",
+        centroids     = REGION_DIR + "/{region}/otu/centroids.fasta",
+        taxa_species  = REGION_DIR + "/{region}/decontam/taxa/silva/taxa_species.rds",
+    output:
+        otu_taxonomy = REGION_DIR + "/{region}/otu/curated_otu_table_taxonomy_silva.tsv",
+    log:
+        "logs/otu_taxonomy_postfilter_silva/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2/otu_taxonomy.R"
+
+
+rule otu_taxonomy_postfilter_rdp:
+    input:
+        curated_table = REGION_DIR + "/{region}/otu/curated_otu_table.tsv",
+        centroids     = REGION_DIR + "/{region}/otu/centroids.fasta",
+        taxa_species  = REGION_DIR + "/{region}/decontam/taxa/rdp/taxa_species.rds",
+    output:
+        otu_taxonomy = REGION_DIR + "/{region}/otu/curated_otu_table_taxonomy_rdp.tsv",
+    log:
+        "logs/otu_taxonomy_postfilter_rdp/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2/otu_taxonomy.R"
+
+
+rule otu_taxonomy_decontam_silva:
+    input:
+        curated_table = REGION_DIR + "/{region}/decontam/otu/curated_otu_table.tsv",
+        centroids     = REGION_DIR + "/{region}/decontam/otu/centroids.fasta",
+        taxa_species  = REGION_DIR + "/{region}/decontam/taxa/silva/taxa_species.rds",
+    output:
+        otu_taxonomy = REGION_DIR + "/{region}/decontam/otu/curated_otu_table_taxonomy_silva.tsv",
+    log:
+        "logs/otu_taxonomy_decontam_silva/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2/otu_taxonomy.R"
+
+
+rule otu_taxonomy_decontam_rdp:
+    input:
+        curated_table = REGION_DIR + "/{region}/decontam/otu/curated_otu_table.tsv",
+        centroids     = REGION_DIR + "/{region}/decontam/otu/centroids.fasta",
+        taxa_species  = REGION_DIR + "/{region}/decontam/taxa/rdp/taxa_species.rds",
+    output:
+        otu_taxonomy = REGION_DIR + "/{region}/decontam/otu/curated_otu_table_taxonomy_rdp.tsv",
+    log:
+        "logs/otu_taxonomy_decontam_rdp/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2/otu_taxonomy.R"
+
+
 rule otu_clustering_all:
     input:
         expand(REGION_DIR + "/{region}/otu/otu_table.tsv", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/otu/centroids.fasta", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/otu/curated_otu_table.tsv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/otu/curated_otu_table_taxonomy_silva.tsv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/otu/curated_otu_table_taxonomy_rdp.tsv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/decontam/otu/otu_table.tsv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/decontam/otu/centroids.fasta", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/decontam/otu/curated_otu_table.tsv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/decontam/otu/curated_otu_table_taxonomy_silva.tsv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/decontam/otu/curated_otu_table_taxonomy_rdp.tsv", region=ALL_REGIONS),
