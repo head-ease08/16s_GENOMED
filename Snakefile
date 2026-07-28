@@ -118,7 +118,7 @@ rule revcomp_primers:
     log:
         "logs/revcomp_primers.log",
     script:
-        "scripts/revcomp_primers.py"
+        "scripts/dada2/revcomp_primers.py"
 
 
 rule trim_primers:
@@ -139,7 +139,7 @@ rule trim_primers:
         min_len    = config.get("min_len", 50),
         error_rate = config.get("error_rate", 0.1),
     shell:
-        "bash scripts/trim_primers.sh "
+        "bash scripts/dada2/trim_primers.sh "
         "{input.fwd} {input.rev} {input.fwd_rc} {input.rev_rc} "
         "{input.r1} {input.r2} {output.r1} {output.r2} "
         "{params.error_rate} {params.min_len} {params.threads} "
@@ -158,7 +158,7 @@ rule quality_per_sample:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/quality_per_sample.R"
+        "scripts/dada2/quality_per_sample.R"
 
 
 rule quality_aggregated:
@@ -173,7 +173,7 @@ rule quality_aggregated:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/quality_aggregated.R"
+        "scripts/dada2/quality_aggregated.R"
 
 
 rule filter_reads:
@@ -189,7 +189,7 @@ rule filter_reads:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/filter_reads.R"
+        "scripts/dada2/filter_reads.R"
 
 
 rule error_correction:
@@ -206,7 +206,7 @@ rule error_correction:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/error_correction_model.R"
+        "scripts/dada2/error_correction_model.R"
 
 
 rule dereplication:
@@ -221,7 +221,7 @@ rule dereplication:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dereplication.R"
+        "scripts/dada2/dereplication.R"
 
 
 rule dada2_inference:
@@ -238,7 +238,7 @@ rule dada2_inference:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dada2_inference.R"
+        "scripts/dada2/dada2_inference.R"
 
 
 rule merge_reads:
@@ -254,7 +254,7 @@ rule merge_reads:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/merge_reads.R"
+        "scripts/dada2/merge_reads.R"
 
 
 rule make_seqtable:
@@ -267,7 +267,7 @@ rule make_seqtable:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_seqtable.R"
+        "scripts/dada2/make_seqtable.R"
 
 
 rule remove_chimera:
@@ -280,7 +280,7 @@ rule remove_chimera:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/remove_chimera.R"
+        "scripts/dada2/remove_chimera.R"
 
 
 rule create_summary:
@@ -296,7 +296,7 @@ rule create_summary:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/create_summary.R"
+        "scripts/dada2/create_summary.R"
 
 
 rule assign_taxonomy_silva:
@@ -310,7 +310,7 @@ rule assign_taxonomy_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/assign_taxa.R"
+        "scripts/dada2/assign_taxa.R"
 
 
 rule add_species_silva:
@@ -324,7 +324,7 @@ rule add_species_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/add_species.R"
+        "scripts/dada2/add_species.R"
 
 
 rule assign_taxonomy_rdp:
@@ -338,7 +338,7 @@ rule assign_taxonomy_rdp:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/assign_taxa.R"
+        "scripts/dada2/assign_taxa.R"
 
 
 rule plot_composition_silva:
@@ -358,7 +358,7 @@ rule plot_composition_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/plot_composition.R"
+        "scripts/dada2/plot_composition.R"
 
 
 rule plot_composition_rdp:
@@ -378,7 +378,7 @@ rule plot_composition_rdp:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/plot_composition.R"
+        "scripts/dada2/plot_composition.R"
 
 
 rule make_abundance_table_silva:
@@ -394,7 +394,7 @@ rule make_abundance_table_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_abundance_table.R"
+        "scripts/dada2/make_abundance_table.R"
 
 
 rule make_abundance_table_rdp:
@@ -410,7 +410,7 @@ rule make_abundance_table_rdp:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_abundance_table.R"
+        "scripts/dada2/make_abundance_table.R"
 
 
 rule build_tree:
@@ -426,7 +426,7 @@ rule build_tree:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/build_tree.R"
+        "scripts/dada2/build_tree.R"
 
 
 # =====================================================================
@@ -453,7 +453,7 @@ rule prep_silva_reference:
     conda:
         "envs/qc_align.yaml"
     shell:
-        "bash scripts/prep_silva_reference.sh {input} {output.fasta} {output.map} "
+        "bash scripts/deprecated/prep_silva_reference.sh {input} {output.fasta} {output.map} "
         "> {log} 2>&1"
 
 
@@ -487,7 +487,7 @@ rule align_silva:
     shell:
         """
         mkdir -p {BAM_DIR}
-        bash scripts/align_silva.sh {input.ref} {input.r1} {input.r2} \
+        bash scripts/deprecated/align_silva.sh {input.ref} {input.r1} {input.r2} \
             {output.bam} {wildcards.sample} {threads} > {log} 2>&1
         """
 
@@ -547,7 +547,7 @@ rule gc_content:
     conda:
         "envs/qc_align.yaml"
     shell:
-        "bash scripts/gc_content.sh {BAM_DIR} {output.tsv}"
+        "bash scripts/deprecated/gc_content.sh {BAM_DIR} {output.tsv}"
 
 
 rule insert_size_summary:
@@ -558,7 +558,7 @@ rule insert_size_summary:
     conda:
         "envs/qc_align.yaml"
     shell:
-        "bash scripts/insert_size_peak.sh {BAM_DIR} {output.tsv}"
+        "bash scripts/deprecated/insert_size_peak.sh {BAM_DIR} {output.tsv}"
 
 
 rule read_length_summary:
@@ -570,7 +570,7 @@ rule read_length_summary:
     params:
         samples = SAMPLES,
     shell:
-        "bash scripts/read_length_summary.sh {QC_DIR} {output.tsv} {params.samples}"
+        "bash scripts/deprecated/read_length_summary.sh {QC_DIR} {output.tsv} {params.samples}"
 
 
 # SG-protocol linked adapter (Illumina universal, see QC_pipe_frag/config.yaml
@@ -635,7 +635,7 @@ rule coverage_metrics:
     shell:
         """
         mkdir -p {COV_DIR}
-        python scripts/coverage_metrics.py {input.bam} {output.tsv}
+        python scripts/deprecated/coverage_metrics.py {input.bam} {output.tsv}
         """
 
 
@@ -665,7 +665,7 @@ rule taxon_mapping_composition:
     shell:
         """
         mkdir -p {COMP_DIR}
-        python scripts/taxon_mapping_composition.py {input.bam} {input.map} {output.tsv}
+        python scripts/deprecated/taxon_mapping_composition.py {input.bam} {input.map} {output.tsv}
         """
 
 
@@ -698,7 +698,7 @@ rule build_qc_table:
         "envs/qc_align.yaml"
     shell:
         """
-        python scripts/build_qc_table.py \
+        python scripts/deprecated/build_qc_table.py \
             --track {input.track} \
             --read_length {input.read_length} \
             --flagstat {input.flagstat} \
@@ -768,7 +768,7 @@ rule region_filter_reads:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/region_filter_reads.R"
+        "scripts/dada2/dada2_se/region_filter_reads.R"
 
 
 rule region_filter_reads_se:
@@ -786,7 +786,7 @@ rule region_filter_reads_se:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/region_filter_reads_se.R"
+        "scripts/dada2/dada2_se/region_filter_reads_se.R"
 
 
 # --- error model: PE vs SE ---
@@ -807,7 +807,7 @@ rule region_error_correction:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/error_correction_model.R"
+        "scripts/dada2/error_correction_model.R"
 
 
 rule region_error_correction_se:
@@ -823,7 +823,7 @@ rule region_error_correction_se:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/error_correction_model_se.R"
+        "scripts/dada2/dada2_se/error_correction_model_se.R"
 
 
 # --- dereplication: PE vs SE ---
@@ -842,7 +842,7 @@ rule region_dereplication:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dereplication.R"
+        "scripts/dada2/dereplication.R"
 
 
 rule region_dereplication_se:
@@ -857,7 +857,7 @@ rule region_dereplication_se:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dereplication_se.R"
+        "scripts/dada2/dada2_se/dereplication_se.R"
 
 
 # --- dada inference: PE vs SE ---
@@ -878,7 +878,7 @@ rule region_dada2_inference:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dada2_inference.R"
+        "scripts/dada2/dada2_inference.R"
 
 
 rule region_dada2_inference_se:
@@ -894,7 +894,7 @@ rule region_dada2_inference_se:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/dada2_inference_se.R"
+        "scripts/dada2/dada2_se/dada2_inference_se.R"
 
 
 # --- seqtable: merge (PE) vs forward-only (SE) ---
@@ -914,7 +914,7 @@ rule region_merge_reads:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/merge_reads.R"
+        "scripts/dada2/merge_reads.R"
 
 
 rule region_make_seqtable:
@@ -929,7 +929,7 @@ rule region_make_seqtable:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_seqtable.R"
+        "scripts/dada2/make_seqtable.R"
 
 
 rule region_make_seqtable_se:
@@ -944,7 +944,7 @@ rule region_make_seqtable_se:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_seqtable_se.R"
+        "scripts/dada2/dada2_se/make_seqtable_se.R"
 
 
 # --- everything past here is region-agnostic (same format seqtab either way) ---
@@ -961,7 +961,7 @@ rule region_remove_chimera:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/remove_chimera.R"
+        "scripts/dada2/remove_chimera.R"
 
 
 rule region_assign_taxonomy_silva:
@@ -977,7 +977,7 @@ rule region_assign_taxonomy_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/assign_taxa.R"
+        "scripts/dada2/assign_taxa.R"
 
 
 rule region_add_species_silva:
@@ -993,7 +993,7 @@ rule region_add_species_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/add_species.R"
+        "scripts/dada2/add_species.R"
 
 
 rule region_assign_taxonomy_rdp:
@@ -1009,7 +1009,7 @@ rule region_assign_taxonomy_rdp:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/assign_taxa.R"
+        "scripts/dada2/assign_taxa.R"
 
 
 rule region_abundance_table_silva:
@@ -1027,7 +1027,7 @@ rule region_abundance_table_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_abundance_table.R"
+        "scripts/dada2/make_abundance_table.R"
 
 
 rule region_abundance_table_rdp:
@@ -1045,7 +1045,7 @@ rule region_abundance_table_rdp:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_abundance_table.R"
+        "scripts/dada2/make_abundance_table.R"
 
 
 rule region_dada2_all:
@@ -1078,7 +1078,7 @@ rule region_decontam:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/decontam_filter.R"
+        "scripts/dada2/dada2_se/decontam_filter.R"
 
 
 rule region_decontam_assign_taxonomy_silva:
@@ -1092,7 +1092,7 @@ rule region_decontam_assign_taxonomy_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/assign_taxa.R"
+        "scripts/dada2/assign_taxa.R"
 
 
 rule region_decontam_add_species_silva:
@@ -1106,7 +1106,7 @@ rule region_decontam_add_species_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/add_species.R"
+        "scripts/dada2/add_species.R"
 
 
 rule region_decontam_assign_taxonomy_rdp:
@@ -1120,7 +1120,7 @@ rule region_decontam_assign_taxonomy_rdp:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/assign_taxa.R"
+        "scripts/dada2/assign_taxa.R"
 
 
 rule region_decontam_abundance_table_silva:
@@ -1136,7 +1136,7 @@ rule region_decontam_abundance_table_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_abundance_table.R"
+        "scripts/dada2/make_abundance_table.R"
 
 
 rule region_decontam_abundance_table_rdp:
@@ -1152,7 +1152,7 @@ rule region_decontam_abundance_table_rdp:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_abundance_table.R"
+        "scripts/dada2/make_abundance_table.R"
 
 
 rule region_decontam_all:
@@ -1184,7 +1184,7 @@ rule region_postfilter:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/postfilter_taxa.R"
+        "scripts/dada2/dada2_se/postfilter_taxa.R"
 
 
 rule region_postfilter_abundance_table_silva:
@@ -1200,7 +1200,7 @@ rule region_postfilter_abundance_table_silva:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_abundance_table.R"
+        "scripts/dada2/make_abundance_table.R"
 
 
 rule region_postfilter_abundance_table_rdp:
@@ -1216,10 +1216,107 @@ rule region_postfilter_abundance_table_rdp:
     conda:
         "envs/dada2.yaml"
     script:
-        "scripts/make_abundance_table.R"
+        "scripts/dada2/make_abundance_table.R"
 
 
 rule region_postfilter_all:
     input:
         expand(REGION_DIR + "/{region}/decontam/postfilter/abundance_table_silva.csv", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/decontam/postfilter/abundance_table_rdp.csv", region=ALL_REGIONS),
+
+
+# =====================================================================
+# OTU clustering (opt-in -- not in `rule all`, run explicitly:
+#   snakemake --cores N --use-conda otu_clustering_all
+# Per-region, post-decontam/postfilter seqtab_nochim.rds converted to FASTA
+# (asv2fa.R writes one record per ASV, header carries ";size=<total
+# abundance>" for vsearch --sizein), then vsearch clusters ASVs into
+# 97%-identity OTUs, self-BLAST builds the match list, LULU curates.
+# =====================================================================
+
+rule asv2fa:
+    input:
+        seqtab_nochim = REGION_DIR + "/{region}/decontam/postfilter/seqtab_nochim.rds",
+    output:
+        fasta = REGION_DIR + "/{region}/otu/asv.fasta",
+    log:
+        "logs/asv2fa/{region}.log",
+    conda:
+        "envs/dada2.yaml"
+    script:
+        "scripts/dada2/asv2fa.R"
+
+
+rule cluster_otus:
+    input:
+        fasta = REGION_DIR + "/{region}/otu/asv.fasta",
+    output:
+        otu_table = REGION_DIR + "/{region}/otu/otu_table.tsv",
+        centroids = REGION_DIR + "/{region}/otu/centroids.fasta",
+    log:
+        "logs/cluster_otus/{region}.log",
+    conda:
+        "envs/vsearch.yaml"
+    shell:
+        """
+        vsearch --cluster_size {input.fasta} --id 0.97 --sizein --sizeout \
+            --otutabout {output.otu_table} --centroids {output.centroids} \
+            > {log} 2>&1
+        """
+
+
+rule make_blastdb:
+    input:
+        centroids = REGION_DIR + "/{region}/otu/centroids.fasta",
+    output:
+        db_done = touch(REGION_DIR + "/{region}/otu/blastdb.done"),
+    log:
+        "logs/make_blastdb/{region}.log",
+    conda:
+        "envs/blast.yaml"
+    shell:
+        "makeblastdb -in {input.centroids} -parse_seqids -dbtype nucl > {log} 2>&1"
+
+
+rule blast_match_list:
+    input:
+        centroids = REGION_DIR + "/{region}/otu/centroids.fasta",
+        db_done   = REGION_DIR + "/{region}/otu/blastdb.done",
+    output:
+        match_list = REGION_DIR + "/{region}/otu/match_list.txt",
+    log:
+        "logs/blast_match_list/{region}.log",
+    threads: config.get("threads", 4)
+    conda:
+        "envs/blast.yaml"
+    shell:
+        """
+        blastn -db {input.centroids} -query {input.centroids} \
+            -outfmt '6 qseqid sseqid pident' \
+            -out {output.match_list} \
+            -qcov_hsp_perc 80 -perc_identity 84 \
+            -num_threads {threads} \
+            > {log} 2>&1
+        """
+
+
+rule run_lulu:
+    input:
+        otu_table  = REGION_DIR + "/{region}/otu/otu_table.tsv",
+        match_list = REGION_DIR + "/{region}/otu/match_list.txt",
+    output:
+        lulu_result   = REGION_DIR + "/{region}/otu/lulu_result.rds",
+        curated_table = REGION_DIR + "/{region}/otu/curated_otu_table.tsv",
+    log:
+        "logs/run_lulu/{region}.log",
+    conda:
+        "envs/lulu.yaml"
+    script:
+        "scripts/dada2/lulu.R"
+
+
+rule otu_clustering_all:
+    input:
+        expand(REGION_DIR + "/{region}/otu/otu_table.tsv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/otu/centroids.fasta", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/otu/curated_otu_table.tsv", region=ALL_REGIONS),

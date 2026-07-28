@@ -1,0 +1,83 @@
+This is cutadapt 5.2 with Python 3.13.14
+Command line parameters: -g AGAGTTTGATCMTGGCTCAG -G GGACCGTGTCTCAGTTCCAG --discard-untrimmed -e 0.1 --minimum-length 50 -j 4 -o results/region/V1_V2/trimmed/RnDD_260713_16_RnDD-16S_n0_R1.fq.gz -p results/region/V1_V2/trimmed/RnDD_260713_16_RnDD-16S_n0_R2.fq.gz data/raw/RnDD_260713_16_RnDD-16S_n0/202607132008_RA01230801023_5P260413092US292662D3_RnD_SRSLY_16S_NPO_260713_RnDD_260713_16_RnDD-16S_n0_L00_R1.fq.gz data/raw/RnDD_260713_16_RnDD-16S_n0/202607132008_RA01230801023_5P260413092US292662D3_RnD_SRSLY_16S_NPO_260713_RnDD_260713_16_RnDD-16S_n0_L00_R2.fq.gz
+Processing paired-end reads on 4 cores ...
+
+=== Summary ===
+
+Total read pairs processed:            412,557
+  Read 1 with adapter:                  29,498 (7.2%)
+  Read 2 with adapter:                  29,446 (7.1%)
+
+== Read fate breakdown ==
+Pairs that were too short:                   1 (0.0%)
+Pairs discarded as untrimmed:          384,373 (93.2%)
+Pairs written (passing filters):        28,183 (6.8%)
+
+Total basepairs processed:   123,767,100 bp
+  Read 1:    61,883,550 bp
+  Read 2:    61,883,550 bp
+Total written (filtered):      7,328,711 bp (5.9%)
+  Read 1:     3,664,533 bp
+  Read 2:     3,664,178 bp
+
+=== First read: Adapter 1 ===
+
+Sequence: AGAGTTTGATCMTGGCTCAG; Type: regular 5'; Length: 20; Trimmed: 29498 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	728	6446.2	0	728
+4	34	1611.6	0	34
+5	9	402.9	0	9
+6	5	100.7	0	5
+7	11	25.2	0	11
+10	4	0.4	1	4
+12	2	0.0	1	2
+15	1	0.0	1	1
+16	4	0.0	1	4
+17	75	0.0	1	73 2
+18	34	0.0	1	32 0 2
+19	163	0.0	1	65 97 1
+20	28364	0.0	2	27645 688 31
+21	54	0.0	2	13 41
+22	1	0.0	2	1
+30	2	0.0	2	2
+32	5	0.0	2	5
+53	2	0.0	2	2
+
+
+=== Second read: Adapter 2 ===
+
+Sequence: GGACCGTGTCTCAGTTCCAG; Type: regular 5'; Length: 20; Trimmed: 29446 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	764	6446.2	0	764
+4	70	1611.6	0	70
+5	3	402.9	0	3
+7	1	25.2	0	1
+8	1	6.3	0	1
+11	1	0.1	1	1
+12	1	0.0	1	1
+13	1	0.0	1	1
+14	2	0.0	1	2
+15	5	0.0	1	5
+16	3	0.0	1	2 1
+17	21	0.0	1	21
+18	37	0.0	1	33 2 2
+19	175	0.0	1	105 69 1
+20	28229	0.0	2	27214 890 125
+21	127	0.0	2	87 38 2
+24	1	0.0	2	1
+30	1	0.0	2	1
+36	1	0.0	2	1
+49	1	0.0	2	1
+139	1	0.0	2	0 0 1

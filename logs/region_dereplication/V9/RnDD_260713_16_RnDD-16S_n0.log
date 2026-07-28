@@ -1,0 +1,5 @@
+Loading required package: Rcpp
+Dereplicating sequence entries in Fastq file: results/region/V9/qc/RnDD_260713_16_RnDD-16S_n0_R1.fq.gz
+Encountered 1642 unique sequences from 64915 total sequences read.
+Dereplicating sequence entries in Fastq file: results/region/V9/qc/RnDD_260713_16_RnDD-16S_n0_R2.fq.gz
+Encountered 2072 unique sequences from 64915 total sequences read.
