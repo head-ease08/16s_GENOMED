@@ -3,6 +3,7 @@ sink(log)
 sink(log, type = "message")
 
 seqtab <- readRDS(snakemake@input$seqtab_nochim)
+seqtab <- seqtab[, colSums(seqtab) > 0, drop = FALSE]
 
 seqs <- colnames(seqtab)
 size <- colSums(seqtab)
