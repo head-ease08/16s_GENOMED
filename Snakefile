@@ -47,6 +47,9 @@ ALL_REGIONS    = list(REGION_PRIMERS.keys())
 MERGE_REGIONS  = [r for r, c in REGION_PRIMERS.items() if c["merge"]]
 SE_REGIONS     = [r for r, c in REGION_PRIMERS.items() if not c["merge"]]
 REGION_DIR     = "results/region"
+
+wildcard_constraints:
+    region = "|".join(ALL_REGIONS),
 SILVA_SPECIES  = REF_DIR + "/silva_v138.2_assignSpecies.fa.gz"
 RDP_TRAINSET   = REF_DIR + "/rdp_19_toSpecies_trainset.fa.gz"
 
