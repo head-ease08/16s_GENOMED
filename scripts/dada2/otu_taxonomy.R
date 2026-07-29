@@ -11,7 +11,7 @@ read_fasta <- function(path) {
     seqs   <- vapply(seq_along(id_idx), function(i) {
         paste(lines[(id_idx[i] + 1):ends[i]], collapse = "")
     }, character(1))
-    setNames(seqs, ids)
+    setNames(toupper(seqs), ids)
 }
 
 curated <- read.table(snakemake@input$curated_table, header = TRUE, row.names = 1,
