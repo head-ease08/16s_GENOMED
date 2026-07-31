@@ -55,10 +55,10 @@ RDP_TRAINSET   = REF_DIR + "/rdp_19_toSpecies_trainset.fa.gz"
 
 # decontam (prevalence method) — negative-control/blank samples in this run.
 # Override with --config neg_samples=RnDD_..,RnDD_.. if the blank set changes.
-NEG_SAMPLE_NUMS = [5, 6, 11, 12, 17, 18, 23, 24]
+NEG_SAMPLE_NUMS = [5, 6, 11, 12, 17, 18, 23, 24, 29, 30]
 NEG_SAMPLES = config.get(
     "neg_samples",
-    [f"RnDD_260713_{n}_RnDD-16S_n0" for n in NEG_SAMPLE_NUMS],
+    [f"RnDD_260720_{n}_RnDD-16S_n0" for n in NEG_SAMPLE_NUMS],
 )
 if isinstance(NEG_SAMPLES, str):
     NEG_SAMPLES = NEG_SAMPLES.split(",")
@@ -1257,24 +1257,29 @@ rule asv2fa:
     script:
         "scripts/dada2/asv2fa.R"
 
-
-rule cluster_otus:
+ rule cluster_otus:
     input:
         fasta = REGION_DIR + "/{region}/otu/asv.fasta",
     output:
         otu_table = REGION_DIR + "/{region}/otu/otu_table.tsv",
         centroids = REGION_DIR + "/{region}/otu/centroids.fasta",
-        uc        = REGION_DIR + "/{region}/otu/cluster_map.uc",
+        # Обязательно объявляем этот файл в output, чтобы vsearch знал, куда писать
+        map_uc = REGION_DIR + "/{region}/otu/cluster_map.uc", 
     log:
         "logs/cluster_otus/{region}.log",
     conda:
         "envs/vsearch.yaml"
     shell:
         """
-        vsearch --cluster_size {input.fasta} --id 0.97 --sizein --sizeout \
-            --otutabout {output.otu_table} --centroids {output.centroids} \
-            --uc {output.uc} \
-            > {log} 2>&1
+
+        vsearch --cluster_size {input.fasta} \
+            --id 0.95 \
+            --sizein \
+            --sizeout \
+            --otutabout {output.otu_table} \
+            --centroids {output.centroids} \
+            --uc {output.map_uc} \
+            --log {log}
         """
 
 
@@ -1369,7 +1374,6 @@ rule cluster_otus_decontam:
     output:
         otu_table = REGION_DIR + "/{region}/decontam/otu/otu_table.tsv",
         centroids = REGION_DIR + "/{region}/decontam/otu/centroids.fasta",
-        uc        = REGION_DIR + "/{region}/decontam/otu/cluster_map.uc",
     log:
         "logs/cluster_otus_decontam/{region}.log",
     conda:
@@ -1378,7 +1382,6 @@ rule cluster_otus_decontam:
         """
         vsearch --cluster_size {input.fasta} --id 0.97 --sizein --sizeout \
             --otutabout {output.otu_table} --centroids {output.centroids} \
-            --uc {output.uc} \
             > {log} 2>&1
         """
 
@@ -1451,19 +1454,17 @@ rule run_lulu_decontam:
 
 
 # =====================================================================
-# Curated OTU table x taxonomy join. Cluster membership (.uc, S/H records)
-# is used to compute an abundance-weighted per-rank consensus taxonomy
-# across ALL members of each OTU's vsearch cluster -- not just the
-# centroid ASV that vsearch greedily picked as cluster seed. See
-# scripts/dada2/otu_taxonomy.R for the consensus algorithm.
+# Curated OTU table x taxonomy join. LULU/vsearch never touch taxonomy --
+# match each OTU's centroid sequence back against the ASV-level
+# taxa_species.rds (assigned pre-postfilter, at the decontam stage) by
+# exact sequence, since asv2fa.R's "ASV<N>" ids are per-run labels, not
+# stable across the postfilter/decontam seqtabs.
 # =====================================================================
 
 rule otu_taxonomy_postfilter_silva:
     input:
         curated_table = REGION_DIR + "/{region}/otu/curated_otu_table.tsv",
         centroids     = REGION_DIR + "/{region}/otu/centroids.fasta",
-        uc            = REGION_DIR + "/{region}/otu/cluster_map.uc",
-        asv_map       = REGION_DIR + "/{region}/otu/asv_map.tsv",
         taxa_species  = REGION_DIR + "/{region}/decontam/taxa/silva/taxa_species.rds",
     output:
         otu_taxonomy = REGION_DIR + "/{region}/otu/curated_otu_table_taxonomy_silva.tsv",
@@ -1479,8 +1480,6 @@ rule otu_taxonomy_postfilter_rdp:
     input:
         curated_table = REGION_DIR + "/{region}/otu/curated_otu_table.tsv",
         centroids     = REGION_DIR + "/{region}/otu/centroids.fasta",
-        uc            = REGION_DIR + "/{region}/otu/cluster_map.uc",
-        asv_map       = REGION_DIR + "/{region}/otu/asv_map.tsv",
         taxa_species  = REGION_DIR + "/{region}/decontam/taxa/rdp/taxa_species.rds",
     output:
         otu_taxonomy = REGION_DIR + "/{region}/otu/curated_otu_table_taxonomy_rdp.tsv",
@@ -1496,8 +1495,6 @@ rule otu_taxonomy_decontam_silva:
     input:
         curated_table = REGION_DIR + "/{region}/decontam/otu/curated_otu_table.tsv",
         centroids     = REGION_DIR + "/{region}/decontam/otu/centroids.fasta",
-        uc            = REGION_DIR + "/{region}/decontam/otu/cluster_map.uc",
-        asv_map       = REGION_DIR + "/{region}/decontam/otu/asv_map.tsv",
         taxa_species  = REGION_DIR + "/{region}/decontam/taxa/silva/taxa_species.rds",
     output:
         otu_taxonomy = REGION_DIR + "/{region}/decontam/otu/curated_otu_table_taxonomy_silva.tsv",
@@ -1513,8 +1510,6 @@ rule otu_taxonomy_decontam_rdp:
     input:
         curated_table = REGION_DIR + "/{region}/decontam/otu/curated_otu_table.tsv",
         centroids     = REGION_DIR + "/{region}/decontam/otu/centroids.fasta",
-        uc            = REGION_DIR + "/{region}/decontam/otu/cluster_map.uc",
-        asv_map       = REGION_DIR + "/{region}/decontam/otu/asv_map.tsv",
         taxa_species  = REGION_DIR + "/{region}/decontam/taxa/rdp/taxa_species.rds",
     output:
         otu_taxonomy = REGION_DIR + "/{region}/decontam/otu/curated_otu_table_taxonomy_rdp.tsv",
@@ -1526,66 +1521,6 @@ rule otu_taxonomy_decontam_rdp:
         "scripts/dada2/otu_taxonomy.R"
 
 
-rule asv_to_otu_postfilter_silva:
-    input:
-        uc           = REGION_DIR + "/{region}/otu/cluster_map.uc",
-        asv_map      = REGION_DIR + "/{region}/otu/asv_map.tsv",
-        taxa_species = REGION_DIR + "/{region}/decontam/taxa/silva/taxa_species.rds",
-    output:
-        composition = REGION_DIR + "/{region}/otu/asv_to_otu_composition_silva.tsv",
-    log:
-        "logs/asv_to_otu_postfilter_silva/{region}.log",
-    conda:
-        "envs/dada2.yaml"
-    script:
-        "scripts/dada2/asv_to_otu.R"
-
-
-rule asv_to_otu_postfilter_rdp:
-    input:
-        uc           = REGION_DIR + "/{region}/otu/cluster_map.uc",
-        asv_map      = REGION_DIR + "/{region}/otu/asv_map.tsv",
-        taxa_species = REGION_DIR + "/{region}/decontam/taxa/rdp/taxa_species.rds",
-    output:
-        composition = REGION_DIR + "/{region}/otu/asv_to_otu_composition_rdp.tsv",
-    log:
-        "logs/asv_to_otu_postfilter_rdp/{region}.log",
-    conda:
-        "envs/dada2.yaml"
-    script:
-        "scripts/dada2/asv_to_otu.R"
-
-
-rule asv_to_otu_decontam_silva:
-    input:
-        uc           = REGION_DIR + "/{region}/decontam/otu/cluster_map.uc",
-        asv_map      = REGION_DIR + "/{region}/decontam/otu/asv_map.tsv",
-        taxa_species = REGION_DIR + "/{region}/decontam/taxa/silva/taxa_species.rds",
-    output:
-        composition = REGION_DIR + "/{region}/decontam/otu/asv_to_otu_composition_silva.tsv",
-    log:
-        "logs/asv_to_otu_decontam_silva/{region}.log",
-    conda:
-        "envs/dada2.yaml"
-    script:
-        "scripts/dada2/asv_to_otu.R"
-
-
-rule asv_to_otu_decontam_rdp:
-    input:
-        uc           = REGION_DIR + "/{region}/decontam/otu/cluster_map.uc",
-        asv_map      = REGION_DIR + "/{region}/decontam/otu/asv_map.tsv",
-        taxa_species = REGION_DIR + "/{region}/decontam/taxa/rdp/taxa_species.rds",
-    output:
-        composition = REGION_DIR + "/{region}/decontam/otu/asv_to_otu_composition_rdp.tsv",
-    log:
-        "logs/asv_to_otu_decontam_rdp/{region}.log",
-    conda:
-        "envs/dada2.yaml"
-    script:
-        "scripts/dada2/asv_to_otu.R"
-
-
 rule otu_clustering_all:
     input:
         expand(REGION_DIR + "/{region}/otu/otu_table.tsv", region=ALL_REGIONS),
@@ -1593,12 +1528,8 @@ rule otu_clustering_all:
         expand(REGION_DIR + "/{region}/otu/curated_otu_table.tsv", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/otu/curated_otu_table_taxonomy_silva.tsv", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/otu/curated_otu_table_taxonomy_rdp.tsv", region=ALL_REGIONS),
-        expand(REGION_DIR + "/{region}/otu/asv_to_otu_composition_silva.tsv", region=ALL_REGIONS),
-        expand(REGION_DIR + "/{region}/otu/asv_to_otu_composition_rdp.tsv", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/decontam/otu/otu_table.tsv", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/decontam/otu/centroids.fasta", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/decontam/otu/curated_otu_table.tsv", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/decontam/otu/curated_otu_table_taxonomy_silva.tsv", region=ALL_REGIONS),
         expand(REGION_DIR + "/{region}/decontam/otu/curated_otu_table_taxonomy_rdp.tsv", region=ALL_REGIONS),
-        expand(REGION_DIR + "/{region}/decontam/otu/asv_to_otu_composition_silva.tsv", region=ALL_REGIONS),
-        expand(REGION_DIR + "/{region}/decontam/otu/asv_to_otu_composition_rdp.tsv", region=ALL_REGIONS),
