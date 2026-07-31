@@ -1257,7 +1257,7 @@ rule asv2fa:
     script:
         "scripts/dada2/asv2fa.R"
 
- rule cluster_otus:
+rule cluster_otus:
     input:
         fasta = REGION_DIR + "/{region}/otu/asv.fasta",
     output:
