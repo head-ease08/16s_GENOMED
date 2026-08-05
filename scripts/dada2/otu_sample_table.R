@@ -2,9 +2,7 @@ log <- file(snakemake@log[[1]], open = "wt")
 sink(log)
 sink(log, type = "message")
 
-seqtab  <- readRDS(snakemake@input$seqtab_nochim)
-samples <- snakemake@params$samples
-rownames(seqtab) <- samples
+seqtab <- readRDS(snakemake@input$seqtab_nochim)
 seqtab <- seqtab[, colSums(seqtab) > 0, drop = FALSE]
 
 asv_map <- read.table(snakemake@input$asv_map, header = TRUE, sep = "\t",

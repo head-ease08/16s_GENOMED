@@ -6,9 +6,6 @@ library(dada2)
 
 seqtab  <- readRDS(snakemake@input$seqtab_nochim)
 taxa    <- readRDS(snakemake@input$taxa_species)
-samples <- snakemake@params$samples
-
-rownames(seqtab) <- samples
 
 counts <- t(seqtab)
 

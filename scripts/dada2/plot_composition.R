@@ -8,11 +8,8 @@ library(tidyr)
 
 seqtab   <- readRDS(snakemake@input$seqtab_nochim)
 taxa     <- readRDS(snakemake@input$taxa_species)
-samples  <- snakemake@params$samples
 top_n    <- snakemake@params$top_n
 meta_csv <- snakemake@params$metadata
-
-rownames(seqtab) <- samples
 
 meta      <- read.csv(meta_csv, check.names = FALSE, stringsAsFactors = FALSE)
 srr_col   <- "Run"
