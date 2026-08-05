@@ -18,8 +18,12 @@ taxa <- taxa[, !duplicated(colnames(taxa), fromLast = TRUE), drop = FALSE]
 relabund <- sweep(counts, 2, colSums(counts), "/") * 100
 colnames(relabund) <- paste0(colnames(counts), "_pct")
 
+# paste0("ASV", integer(0)) returns "ASV" (length 1), not character(0) --
+# guard the 0-row case explicitly.
+asv_id <- if (nrow(counts)) paste0("ASV", seq_len(nrow(counts))) else character(0)
+
 abundance <- cbind(
-    asv_id   = paste0("ASV", seq_len(nrow(counts))),
+    asv_id   = asv_id,
     sequence = shared,
     as.data.frame(taxa),
     as.data.frame(counts),
