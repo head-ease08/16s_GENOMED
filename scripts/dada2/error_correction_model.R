@@ -4,9 +4,14 @@ sink(log, type = "message")
 
 library(dada2)
 library(ggplot2)
+library(ShortRead)
 
-forward_err <- learnErrors(snakemake@input$r1, multithread = TRUE, MAX_CONSIST = 20)
-reverse_err <- learnErrors(snakemake@input$r2, multithread = TRUE, MAX_CONSIST = 20)
+# some samples/regions had 0 reads survive upstream filtering, leaving an
+# empty placeholder gzip -- learnErrors chokes on those, so drop them.
+nonempty <- function(files) Filter(function(f) countFastq(f)$records > 0, files)
+
+forward_err <- learnErrors(nonempty(snakemake@input$r1), multithread = TRUE, MAX_CONSIST = 20)
+reverse_err <- learnErrors(nonempty(snakemake@input$r2), multithread = TRUE, MAX_CONSIST = 20)
 
 saveRDS(forward_err, snakemake@output$r1_rds)
 saveRDS(reverse_err, snakemake@output$r2_rds)
