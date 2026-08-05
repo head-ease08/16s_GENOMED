@@ -754,6 +754,8 @@ rule demux_region:
 
 # --- filter_reads: PE (merge regions) vs SE (forward-only regions) ---
 
+ruleorder: region_filter_reads > region_filter_reads_se
+
 rule region_filter_reads:
     input:
         r1 = REGION_DIR + "/{region}/trimmed/{sample}_R1.fq.gz",
