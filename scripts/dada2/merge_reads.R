@@ -4,15 +4,22 @@ sink(log, type = "message")
 
 library(dada2)
 
-saveRDS(
+dada_r1  <- readRDS(snakemake@input$r1_rds_dada)
+derep_r1 <- readRDS(snakemake@input$r1_rds_derep)
+dada_r2  <- readRDS(snakemake@input$r2_rds_dada)
+derep_r2 <- readRDS(snakemake@input$r2_rds_derep)
+
+# upstream NULL means this sample/region had 0 reads survive filtering --
+# propagate NULL through rather than calling mergePairs() on it.
+merged <- if (is.null(dada_r1) || is.null(dada_r2)) {
+    NULL
+} else {
     mergePairs(
-        readRDS(snakemake@input$r1_rds_dada),
-        readRDS(snakemake@input$r1_rds_derep),
-        readRDS(snakemake@input$r2_rds_dada),
-        readRDS(snakemake@input$r2_rds_derep),
+        dada_r1, derep_r1, dada_r2, derep_r2,
         minOverlap  = 12,
         maxMismatch = 0,
         verbose     = TRUE
-    ),
-    snakemake@output$merged_reads
-)
+    )
+}
+
+saveRDS(merged, snakemake@output$merged_reads)

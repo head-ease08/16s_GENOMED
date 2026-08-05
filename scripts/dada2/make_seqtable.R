@@ -4,7 +4,11 @@ sink(log, type = "message")
 
 library(dada2)
 
+# drop samples that had 0 reads survive filtering upstream (NULL placeholder)
+merged <- lapply(snakemake@input$merged_reads, readRDS)
+merged <- merged[!vapply(merged, is.null, logical(1))]
+
 saveRDS(
-    makeSequenceTable(lapply(snakemake@input$merged_reads, readRDS)),
+    makeSequenceTable(merged),
     snakemake@output$sequence_table
 )
