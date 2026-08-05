@@ -755,6 +755,10 @@ rule demux_region:
 # --- filter_reads: PE (merge regions) vs SE (forward-only regions) ---
 
 ruleorder: region_filter_reads > region_filter_reads_se
+ruleorder: region_error_correction > region_error_correction_se
+ruleorder: region_dereplication > region_dereplication_se
+ruleorder: region_dada2_inference > region_dada2_inference_se
+ruleorder: region_make_seqtable > region_make_seqtable_se
 
 rule region_filter_reads:
     input:
