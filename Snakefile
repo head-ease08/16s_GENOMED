@@ -1293,7 +1293,13 @@ rule make_blastdb:
     conda:
         "envs/blast.yaml"
     shell:
-        "makeblastdb -in {input.centroids} -parse_seqids -dbtype nucl > {log} 2>&1"
+        """
+        if [ -s {input.centroids} ]; then
+            makeblastdb -in {input.centroids} -parse_seqids -dbtype nucl > {log} 2>&1
+        else
+            echo "centroids.fasta is empty (0 ASVs survived) -- skipping makeblastdb" > {log}
+        fi
+        """
 
 
 rule blast_match_list:
@@ -1309,12 +1315,17 @@ rule blast_match_list:
         "envs/blast.yaml"
     shell:
         """
-        blastn -db {input.centroids} -query {input.centroids} \
-            -outfmt '6 qseqid sseqid pident' \
-            -out {output.match_list} \
-            -qcov_hsp_perc 80 -perc_identity 84 \
-            -num_threads {threads} \
-            > {log} 2>&1
+        if [ -s {input.centroids} ]; then
+            blastn -db {input.centroids} -query {input.centroids} \
+                -outfmt '6 qseqid sseqid pident' \
+                -out {output.match_list} \
+                -qcov_hsp_perc 80 -perc_identity 84 \
+                -num_threads {threads} \
+                > {log} 2>&1
+        else
+            : > {output.match_list}
+            echo "centroids.fasta is empty (0 ASVs survived) -- skipping blastn" > {log}
+        fi
         """
 
 
@@ -1398,7 +1409,13 @@ rule make_blastdb_decontam:
     conda:
         "envs/blast.yaml"
     shell:
-        "makeblastdb -in {input.centroids} -parse_seqids -dbtype nucl > {log} 2>&1"
+        """
+        if [ -s {input.centroids} ]; then
+            makeblastdb -in {input.centroids} -parse_seqids -dbtype nucl > {log} 2>&1
+        else
+            echo "centroids.fasta is empty (0 ASVs survived) -- skipping makeblastdb" > {log}
+        fi
+        """
 
 
 rule blast_match_list_decontam:
@@ -1414,12 +1431,17 @@ rule blast_match_list_decontam:
         "envs/blast.yaml"
     shell:
         """
-        blastn -db {input.centroids} -query {input.centroids} \
-            -outfmt '6 qseqid sseqid pident' \
-            -out {output.match_list} \
-            -qcov_hsp_perc 80 -perc_identity 84 \
-            -num_threads {threads} \
-            > {log} 2>&1
+        if [ -s {input.centroids} ]; then
+            blastn -db {input.centroids} -query {input.centroids} \
+                -outfmt '6 qseqid sseqid pident' \
+                -out {output.match_list} \
+                -qcov_hsp_perc 80 -perc_identity 84 \
+                -num_threads {threads} \
+                > {log} 2>&1
+        else
+            : > {output.match_list}
+            echo "centroids.fasta is empty (0 ASVs survived) -- skipping blastn" > {log}
+        fi
         """
 
 
