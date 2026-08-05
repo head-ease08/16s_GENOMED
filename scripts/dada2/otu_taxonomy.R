@@ -30,6 +30,14 @@ parse_size <- function(x) as.numeric(sub("^.*;size=", "", x))
 
 curated <- read.table(snakemake@input$curated_table, header = TRUE, row.names = 1,
                        sep = "\t", check.names = FALSE, comment.char = "")
+
+# 0 ASVs survived upstream -- cluster_map.uc is a 0-byte file in that case,
+# which read.table can't parse ("no lines available in input").
+if (nrow(curated) == 0) {
+    write.table(curated, snakemake@output$otu_taxonomy, sep = "\t", quote = FALSE, row.names = FALSE)
+    quit(save = "no", status = 0)
+}
+
 centroid_seqs <- read_fasta(snakemake@input$centroids)
 
 taxa <- readRDS(snakemake@input$taxa_species)
