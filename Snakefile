@@ -37,11 +37,11 @@ COMP_DIR       = QC_ALIGN_DIR + "/composition"
 # than soft-trimming it. 125/120 leaves a small quality-trim margin under
 # that 130bp ceiling.
 REGION_PRIMERS = {
-    "V1_V2": {"fwd": "AGAGTTTGATCMTGGCTCAG",  "rev": "GGACCGTGTCTCAGTTCCAG",    "truncLen": 125,        "merge": False},
-    "V9":    {"fwd": "TGCCACGGTGAATACGTTCC",  "rev": "CCTTGTTACGACTTCACCCCA",  "truncLen": (125, 120), "merge": True},
-    "V3_V4": {"fwd": "CCTACGGGNGGCWGCAG",     "rev": "GGACTACHVGGGTATCTAATCC", "truncLen": 125,        "merge": False},
-    "V4_V5": {"fwd": "GGAGGGTGCAAGCGTTAATC",  "rev": "TTAACCTTGCGGCCGTACTC",   "truncLen": 125,        "merge": False},
-    "V6_V8": {"fwd": "CGGTGGAGCATGTGGTTTAA",  "rev": "AGTTGCAGACTCCAATCCGG",   "truncLen": 125,        "merge": False},
+    "V1_V2": {"fwd": "AGAGTTTGATCMTGGCTCAG",  "rev": "GGACCGTGTCTCAGTTCCAG",    "truncLen": (260, 260), "merge": True},
+    "V9":    {"fwd": "TGCCACGGTGAATACGTTCC",  "rev": "CCTTGTTACGACTTCACCCCA",  "truncLen": (260, 260), "merge": True},
+    "V3_V4": {"fwd": "CCTACGGGNGGCWGCAG",     "rev": "GGACTACHVGGGTATCTAATCC", "truncLen": (260, 260), "merge": True},
+    "V4_V5": {"fwd": "GGAGGGTGCAAGCGTTAATC",  "rev": "TTAACCTTGCGGCCGTACTC",   "truncLen": (260, 260), "merge": True},
+    "V6_V8": {"fwd": "CGGTGGAGCATGTGGTTTAA",  "rev": "AGTTGCAGACTCCAATCCGG",   "truncLen": (260, 260), "merge": True},
 }
 ALL_REGIONS    = list(REGION_PRIMERS.keys())
 MERGE_REGIONS  = [r for r, c in REGION_PRIMERS.items() if c["merge"]]
