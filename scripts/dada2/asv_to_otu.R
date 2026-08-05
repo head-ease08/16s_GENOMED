@@ -7,6 +7,17 @@ sink(log, type = "message")
 # diagnostic/audit view alongside the consensus taxonomy in otu_taxonomy.R.
 strip_size <- function(x) sub(";size=.*$", "", x)
 
+empty_out <- data.frame(OTU_ID = character(0), ASV_ID = character(0),
+                         Taxonomy = character(0), Sequence = character(0),
+                         stringsAsFactors = FALSE)
+
+# 0 ASVs survived upstream -- vsearch writes a 0-byte cluster_map.uc in that
+# case, which read.table can't parse at all ("no lines available in input").
+if (file.size(snakemake@input$uc) == 0) {
+    write.table(empty_out, snakemake@output$composition, sep = "\t", row.names = FALSE, quote = FALSE)
+    quit(save = "no", status = 0)
+}
+
 asv_map <- read.table(snakemake@input$asv_map, header = TRUE, sep = "\t",
                        stringsAsFactors = FALSE)
 seq_of_asv <- setNames(toupper(asv_map$sequence), asv_map$asv_id)

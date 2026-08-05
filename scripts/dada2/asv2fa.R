@@ -5,7 +5,10 @@ sink(log, type = "message")
 seqtab <- readRDS(snakemake@input$seqtab_nochim)
 seqtab <- seqtab[, colSums(seqtab) > 0, drop = FALSE]
 
-seqs <- colnames(seqtab)
+# colnames() on a 0-column matrix with no dimnames returns NULL, not
+# character(0) -- passing NULL into data.frame() below silently drops the
+# whole column instead of producing an empty one, so coerce explicitly.
+seqs <- as.character(colnames(seqtab))
 size <- colSums(seqtab)
 
 # paste0("ASV", integer(0)) returns "ASV" (length 1), not character(0) --

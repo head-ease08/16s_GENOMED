@@ -5,6 +5,14 @@ sink(log, type = "message")
 seqtab <- readRDS(snakemake@input$seqtab_nochim)
 seqtab <- seqtab[, colSums(seqtab) > 0, drop = FALSE]
 
+# 0 ASVs survived upstream -- vsearch writes a 0-byte otu_table.tsv in that
+# case, which read.table can't parse at all ("no lines available in input").
+if (file.size(snakemake@input$otu_table) == 0) {
+    write.table(seqtab, snakemake@output$otu_sample_table,
+                sep = "\t", quote = FALSE, col.names = NA)
+    quit(save = "no", status = 0)
+}
+
 asv_map <- read.table(snakemake@input$asv_map, header = TRUE, sep = "\t",
                        stringsAsFactors = FALSE)
 seq_of_asv <- setNames(asv_map$sequence, asv_map$asv_id)
