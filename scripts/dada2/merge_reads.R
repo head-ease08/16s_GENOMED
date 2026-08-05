@@ -17,7 +17,7 @@ merged <- if (is.null(dada_r1) || is.null(dada_r2)) {
     mergePairs(
         dada_r1, derep_r1, dada_r2, derep_r2,
         minOverlap  = 12,
-        maxMismatch = 0,
+        maxMismatch = 1,
         verbose     = TRUE
     )
 }
