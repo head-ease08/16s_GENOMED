@@ -19,3 +19,8 @@ saveRDS(
     ),
     snakemake@output$stats
 )
+
+# filterAndTrim skips writing output entirely when 0 reads survive
+# (e.g. sample has no reads for this region in a multiplexed pool) --
+# touch a valid empty gzip so downstream rules still get their input.
+if (!file.exists(snakemake@output$r1)) close(gzfile(snakemake@output$r1, "wb"))
