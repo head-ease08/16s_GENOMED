@@ -21,21 +21,20 @@ COMP_DIR       = QC_ALIGN_DIR + "/composition"
 # Per-region DADA2 (rules at the bottom, target: region_dada2_all).
 # Multiplexed multi-V-region primer pool (see primers/*.fasta) can't go
 # through one pooled DADA2 run: learnErrors assumes one error model for one
-# amplicon length, and 2x151bp reads physically can't overlap-merge every
-# region's amplicon. V3_V4 (~407bp insert), V4_V5 (~330bp), V6_V8 (~341bp)
-# are too long for 2x151bp to ever meet in the middle regardless of truncLen
-# -- those run DADA2 forward-read-only (no merge step). V9 (~132bp insert)
-# clearly merges. V1_V2 (~280bp insert) was tried in the merge bucket but
-# measured 0% mergePairs success at truncLen (125,120) -- 245bp of usable
-# sequence can't span a ~280bp post-primer-trim insert. Moved to the SE
-# bucket like V3_V4/V4_V5/V6_V8.
+# amplicon length, and not every region's amplicon overlap-merges at the
+# same truncLen. This run is long-read paired-end, long enough that
+# truncLen (195,195) -- 390bp of usable post-primer-trim sequence -- merges
+# V1_V2 (~280bp insert), V9 (~132bp insert), V4_V5 (~330bp insert), and
+# V6_V8 (~341bp insert). V3_V4 (~407bp insert) is still too long to meet in
+# the middle at this truncLen regardless of read length headroom -- that one
+# stays DADA2 forward-read-only (no merge step), same SE bucket.
 #
 # truncLen note: demux_region strips the primer with cutadapt BEFORE
 # filterAndTrim ever sees the read, so the truncLen budget is against the
-# post-primer-trim length (measured ~130bp for a 151bp raw read, not 151),
-# and filterAndTrim discards any read shorter than truncLen outright rather
-# than soft-trimming it. 125/120 leaves a small quality-trim margin under
-# that 130bp ceiling.
+# post-primer-trim length, not the raw read length, and filterAndTrim
+# discards any read shorter than truncLen outright rather than soft-trimming
+# it -- truncLen must stay under the actual post-primer-trim read length for
+# this run's chemistry or every read gets dropped.
 REGION_PRIMERS = {
     "V1_V2": {"fwd": "AGAGTTTGATCMTGGCTCAG",  "rev": "GGACCGTGTCTCAGTTCCAG",    "truncLen": (195, 195), "merge": True},
     "V9":    {"fwd": "TGCCACGGTGAATACGTTCC",  "rev": "CCTTGTTACGACTTCACCCCA",  "truncLen": (195, 195), "merge": True},
