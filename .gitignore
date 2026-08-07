@@ -8,18 +8,15 @@ references/*.fa.gz
 
 logs/*
 
-results/*.rds
-results/plots/
+results/*
+
 MicrobiomeAnalyst_data/
-
-
 
 .Rhistory
 .RData
 .Rproj.user/
 
 .snakemake/
-
 
 !data/trimmed/cutadapt_summary.tsv
 !results/track.csv
