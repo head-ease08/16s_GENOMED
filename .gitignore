@@ -2,13 +2,16 @@
 data/raw/*.fastq*
 data/trimmed/*.fastq*
 data/qc/*.fastq*
+data/trimmed/logs/
+
 references/*.fa.gz
 
+logs/*
 
-data/trimmed/logs/
 results/*.rds
 results/plots/
 MicrobiomeAnalyst_data/
+
 
 
 .Rhistory
