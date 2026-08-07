@@ -1,0 +1,81 @@
+This is cutadapt 5.2 with Python 3.13.14
+Command line parameters: -g CGGTGGAGCATGTGGTTTAA -G AGTTGCAGACTCCAATCCGG --discard-untrimmed -e 0.1 --minimum-length 50 -j 4 -o results/region/V6_V8/trimmed/RnDD_260801_21_RnDD-16S_n0_R1.fq.gz -p results/region/V6_V8/trimmed/RnDD_260801_21_RnDD-16S_n0_R2.fq.gz /media/genomed/DATA_15Tb/16s_3run/RnDD_260801_21_RnDD-16S_n0/202608012056_RA01230801023_5P251211086US292659BX_RnD_16S_260801_RnDD_260801_21_RnDD-16S_n0_L00_R1.fq.gz /media/genomed/DATA_15Tb/16s_3run/RnDD_260801_21_RnDD-16S_n0/202608012056_RA01230801023_5P251211086US292659BX_RnD_16S_260801_RnDD_260801_21_RnDD-16S_n0_L00_R2.fq.gz
+Processing paired-end reads on 4 cores ...
+
+=== Summary ===
+
+Total read pairs processed:            856,880
+  Read 1 with adapter:                  17,094 (2.0%)
+  Read 2 with adapter:                  12,388 (1.4%)
+
+== Read fate breakdown ==
+Pairs that were too short:                   0 (0.0%)
+Pairs discarded as untrimmed:          846,890 (98.8%)
+Pairs written (passing filters):         9,990 (1.2%)
+
+Total basepairs processed:   514,128,000 bp
+  Read 1:   257,064,000 bp
+  Read 2:   257,064,000 bp
+Total written (filtered):      5,598,360 bp (1.1%)
+  Read 1:     2,799,211 bp
+  Read 2:     2,799,149 bp
+
+=== First read: Adapter 1 ===
+
+Sequence: CGGTGGAGCATGTGGTTTAA; Type: regular 5'; Length: 20; Trimmed: 17094 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	1121	13388.8	0	1121
+4	5740	3347.2	0	5740
+5	6	836.8	0	6
+6	2	209.2	0	2
+7	3	52.3	0	3
+9	3	3.3	0	3
+10	1	0.8	1	0 1
+11	5	0.2	1	4 1
+12	1	0.1	1	1
+13	7	0.0	1	1 6
+14	2	0.0	1	1 1
+16	6	0.0	1	1 5
+17	1	0.0	1	1
+18	3	0.0	1	1 2
+19	15	0.0	1	1 13 1
+20	10158	0.0	2	3052 5167 1939
+21	20	0.0	2	0 8 12
+
+
+=== Second read: Adapter 2 ===
+
+Sequence: AGTTGCAGACTCCAATCCGG; Type: regular 5'; Length: 20; Trimmed: 12388 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	1181	13388.8	0	1181
+4	503	3347.2	0	503
+5	40	836.8	0	40
+6	1	209.2	0	1
+9	1	3.3	0	1
+11	1	0.2	1	1
+13	4	0.0	1	4
+14	1	0.0	1	1
+15	3	0.0	1	3
+16	2	0.0	1	2
+17	4	0.0	1	4
+18	3	0.0	1	3
+19	43	0.0	1	19 23 1
+20	10562	0.0	2	10264 245 53
+21	9	0.0	2	1 7 1
+26	1	0.0	2	0 0 1
+30	1	0.0	2	1
+32	1	0.0	2	1
+58	1	0.0	2	0 0 1
+204	26	0.0	2	1 3 22

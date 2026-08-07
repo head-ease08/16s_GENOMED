@@ -1,0 +1,29 @@
+This is cutadapt 5.2 with Python 3.13.14
+Command line parameters: -g CCTACGGGNGGCWGCAG -G GGACTACHVGGGTATCTAATCC --discard-untrimmed -e 0.1 --minimum-length 50 -j 4 -o results/region/V3_V4/trimmed/RnDD_260801_51_RnDD-16S_n0_R1.fq.gz -p results/region/V3_V4/trimmed/RnDD_260801_51_RnDD-16S_n0_R2.fq.gz /media/genomed/DATA_15Tb/16s_3run/RnDD_260801_51_RnDD-16S_n0/202608012056_RA01230801023_5P251211086US292659BX_RnD_16S_260801_RnDD_260801_51_RnDD-16S_n0_L00_R1.fq.gz /media/genomed/DATA_15Tb/16s_3run/RnDD_260801_51_RnDD-16S_n0/202608012056_RA01230801023_5P251211086US292659BX_RnD_16S_260801_RnDD_260801_51_RnDD-16S_n0_L00_R2.fq.gz
+Processing paired-end reads on 4 cores ...
+
+=== Summary ===
+
+Total read pairs processed:                  9
+  Read 1 with adapter:                       0 (0.0%)
+  Read 2 with adapter:                       0 (0.0%)
+
+== Read fate breakdown ==
+Pairs that were too short:                   0 (0.0%)
+Pairs discarded as untrimmed:                9 (100.0%)
+Pairs written (passing filters):             0 (0.0%)
+
+Total basepairs processed:         5,400 bp
+  Read 1:         2,700 bp
+  Read 2:         2,700 bp
+Total written (filtered):              0 bp (0.0%)
+  Read 1:             0 bp
+  Read 2:             0 bp
+
+=== First read: Adapter 1 ===
+
+Sequence: CCTACGGGNGGCWGCAG; Type: regular 5'; Length: 17; Trimmed: 0 times
+
+=== Second read: Adapter 2 ===
+
+Sequence: GGACTACHVGGGTATCTAATCC; Type: regular 5'; Length: 22; Trimmed: 0 times

@@ -37,7 +37,7 @@ COMP_DIR       = QC_ALIGN_DIR + "/composition"
 # this run's chemistry or every read gets dropped.
 REGION_PRIMERS = {
     "V1_V2": {"fwd": "AGAGTTTGATCMTGGCTCAG",  "rev": "GGACCGTGTCTCAGTTCCAG",    "truncLen": (195, 195), "merge": True},
-    "V9":    {"fwd": "TGCCACGGTGAATACGTTCC",  "rev": "CCTTGTTACGACTTCACCCCA",  "truncLen": (195, 195), "merge": True},
+    "V9":    {"fwd": "TGCCACGGTGAATACGTTCC",  "rev": "CCTTGTTACGACTTCACCCCA",  "truncLen": (0, 0), "merge": True},
     "V3_V4": {"fwd": "CCTACGGGNGGCWGCAG",     "rev": "GGACTACHVGGGTATCTAATCC", "truncLen": 195,        "merge": False},
     "V4_V5": {"fwd": "GGAGGGTGCAAGCGTTAATC",  "rev": "TTAACCTTGCGGCCGTACTC",   "truncLen": (195, 195), "merge": True},
     "V6_V8": {"fwd": "CGGTGGAGCATGTGGTTTAA",  "rev": "AGTTGCAGACTCCAATCCGG",   "truncLen": (195, 195), "merge": True},
@@ -99,6 +99,8 @@ if not SAMPLES:
 
 rule all:
     input:
+        expand(REGION_DIR + "/{region}/abundance_table_silva.csv", region=ALL_REGIONS),
+        expand(REGION_DIR + "/{region}/abundance_table_rdp.csv",   region=ALL_REGIONS),
         "results/track.csv",
         "results/seqtab_nochim.rds",
         "results/taxa/silva/taxa_species.rds",
@@ -723,7 +725,7 @@ rule qc_align_all:
 #   snakemake --cores N --use-conda region_dada2_all
 # Demultiplexes raw reads by V-region primer pair, then runs a separate
 # DADA2 pipeline per region with a region-appropriate truncLen. V1_V2/V9
-# merge normally; V3_V4/V4_V5/V6_V8 can't physically overlap at 2x151bp
+# merge normally; V3_V4/V4_V5/V6_V8 can't physically overlap at 2x300bp (truncLen 195/195)
 # (see REGION_PRIMERS comment above) so those run forward-read-only.
 # =====================================================================
 

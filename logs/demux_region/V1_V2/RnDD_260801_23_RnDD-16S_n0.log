@@ -1,0 +1,94 @@
+This is cutadapt 5.2 with Python 3.13.14
+Command line parameters: -g AGAGTTTGATCMTGGCTCAG -G GGACCGTGTCTCAGTTCCAG --discard-untrimmed -e 0.1 --minimum-length 50 -j 4 -o results/region/V1_V2/trimmed/RnDD_260801_23_RnDD-16S_n0_R1.fq.gz -p results/region/V1_V2/trimmed/RnDD_260801_23_RnDD-16S_n0_R2.fq.gz /media/genomed/DATA_15Tb/16s_3run/RnDD_260801_23_RnDD-16S_n0/202608012056_RA01230801023_5P251211086US292659BX_RnD_16S_260801_RnDD_260801_23_RnDD-16S_n0_L00_R1.fq.gz /media/genomed/DATA_15Tb/16s_3run/RnDD_260801_23_RnDD-16S_n0/202608012056_RA01230801023_5P251211086US292659BX_RnD_16S_260801_RnDD_260801_23_RnDD-16S_n0_L00_R2.fq.gz
+Processing paired-end reads on 4 cores ...
+
+=== Summary ===
+
+Total read pairs processed:            424,204
+  Read 1 with adapter:                  31,304 (7.4%)
+  Read 2 with adapter:                  31,943 (7.5%)
+
+== Read fate breakdown ==
+Pairs that were too short:                   2 (0.0%)
+Pairs discarded as untrimmed:          393,764 (92.8%)
+Pairs written (passing filters):        30,438 (7.2%)
+
+Total basepairs processed:   254,522,400 bp
+  Read 1:   127,261,200 bp
+  Read 2:   127,261,200 bp
+Total written (filtered):     17,046,666 bp (6.7%)
+  Read 1:     8,524,699 bp
+  Read 2:     8,521,967 bp
+
+=== First read: Adapter 1 ===
+
+Sequence: AGAGTTTGATCMTGGCTCAG; Type: regular 5'; Length: 20; Trimmed: 31304 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	222	6628.2	0	222
+4	19	1657.0	0	19
+5	11	414.3	0	11
+6	11	103.6	0	11
+7	96	25.9	0	96
+8	11	6.5	0	11
+9	5	1.6	0	5
+10	5	0.4	1	0 5
+11	5	0.1	1	4 1
+12	6	0.0	1	6
+13	1	0.0	1	1
+14	9	0.0	1	6 3
+15	5	0.0	1	3 2
+16	2	0.0	1	1 1
+17	42	0.0	1	19 23
+18	72	0.0	1	54 18
+19	169	0.0	1	21 126 22
+20	30546	0.0	2	15882 12105 2559
+21	64	0.0	2	9 35 20
+24	1	0.0	2	1
+160	1	0.0	2	1
+163	1	0.0	2	0 1
+
+
+=== Second read: Adapter 2 ===
+
+Sequence: GGACCGTGTCTCAGTTCCAG; Type: regular 5'; Length: 20; Trimmed: 31943 times
+
+Minimum overlap: 3
+No. of allowed errors:
+1-9 bp: 0; 10-19 bp: 1; 20 bp: 2
+
+Overview of removed sequences
+length	count	expect	max.err	error counts
+3	189	6628.2	0	189
+4	206	1657.0	0	206
+5	18	414.3	0	18
+6	2	103.6	0	2
+7	13	25.9	0	13
+8	19	6.5	0	19
+9	35	1.6	0	34 1
+10	1	0.4	1	1
+11	3	0.1	1	3
+12	1	0.0	1	1
+13	7	0.0	1	7
+15	15	0.0	1	15
+16	23	0.0	1	23
+17	78	0.0	1	67 11
+18	140	0.0	1	129 3 8
+19	338	0.0	1	244 90 4
+20	30677	0.0	2	29202 1345 130
+21	149	0.0	2	87 60 2
+22	1	0.0	2	0 1
+24	3	0.0	2	3
+26	1	0.0	2	1
+30	2	0.0	2	2
+33	2	0.0	2	1 1
+155	1	0.0	2	1
+160	1	0.0	2	1
+163	16	0.0	2	13 3
+290	1	0.0	2	0 0 1
+291	1	0.0	2	0 0 1
