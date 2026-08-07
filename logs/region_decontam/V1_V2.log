@@ -1,7 +1,0 @@
-Negative controls found in seqtab: 1 of 8 expected
-Warning messages:
-1: In .is_contaminant(seqtab, conc = conc, neg = neg, method = method,  :
-  Removed 3 samples with zero total counts (or frequency).
-2: In .is_contaminant(seqtab, conc = conc, neg = neg, method = method,  :
-  Some batches have very few (<=4) samples.
-Contaminant ASVs: 0 of 7 

@@ -1,9 +1,0 @@
-Loading required package: Rcpp
-The filter removed all reads: results/region/V4_V5/qc/RnDD_260801_46_RnDD-16S_n0_R1.fq.gz and results/region/V4_V5/qc/RnDD_260801_46_RnDD-16S_n0_R2.fq.gz not written.
-Warning messages:
-1: In file.remove(fout[[1]]) :
-  cannot remove file 'results/region/V4_V5/qc/RnDD_260801_46_RnDD-16S_n0_R1.fq.gz', reason 'No such file or directory'
-2: In file.remove(fout[[2]]) :
-  cannot remove file 'results/region/V4_V5/qc/RnDD_260801_46_RnDD-16S_n0_R2.fq.gz', reason 'No such file or directory'
-3: In filterAndTrim(snakemake@input$r1, snakemake@output$r1, snakemake@input$r2,  :
-  No reads passed the filter. Please revisit your filtering parameters.

@@ -1,5 +1,0 @@
-Loading required package: Rcpp
-The filter removed all reads: results/region/V1_V2/qc/RnDD_260801_41_RnDD-16S_n0_R1.fq.gz and results/region/V1_V2/qc/RnDD_260801_41_RnDD-16S_n0_R2.fq.gz not written.
-Warning message:
-In filterAndTrim(snakemake@input$r1, snakemake@output$r1, snakemake@input$r2,  :
-  No reads passed the filter. Please revisit your filtering parameters.
